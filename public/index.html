@@ -202,6 +202,7 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .micseg button.on{background:var(--ink);color:var(--rail)}
 .ptt-big{display:block;width:100%;margin-top:6px;height:40px;border-radius:12px;border:1px solid rgba(126,224,122,.5);background:rgba(126,224,122,.12);color:var(--ink);font-weight:800;font-size:14px;touch-action:none;user-select:none;-webkit-user-select:none}
 .ptt-big.hold{background:var(--talk);color:#0b2a0a}
+.micwarn{display:block;width:100%;margin-top:6px;height:38px;border-radius:12px;border:1px solid rgba(229,38,63,.6);background:rgba(229,38,63,.15);color:#ffb3bd;font-weight:800;font-size:13px}
 .pv .baad{flex-direction:column;gap:2px;padding:4px 6px} .pv .baad .cr{font-size:15px}
 /* home, nav, profile */
 .homehead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 6px}
@@ -789,6 +790,7 @@ function renderMe(){
   <button class="cta" id="meSave" type="button">${ME.onboard?'Shuru karo':'Save karo'}</button>
   ${ME.onboard?'<p class="muted" style="font-size:12px;margin:0;text-align:center">Bas naam aur avatar. Koi email, phone ya password nahi.</p>':`
   <div class="panel"><p class="lab">Tumhare stats</p><div class="statgrid"><div><b>🏆 ${st.tw}</b><span>Tournament wins</span></div><div><b>${st.finals}</b><span>Finals</span></div><div><b>${st.tablesW}/${st.tablesP}</b><span>Tables won</span></div><div><b>${st.kotGiven}</b><span>Kot diye</span></div><div class="bad"><b>${st.kotTaken}</b><span>Kot khaye</span></div><div><b>${st.tours}</b><span>Tournaments</span></div></div></div>
+  <div class="panel menu" style="margin:0"><div class="row"><div><b>Mic permission</b><small id="meMicTxt">Voice chat ke liye</small></div><button class="pill" id="meMic" type="button">Check karo</button></div></div>
   <div class="panel menu" style="margin:0"><div class="row"><div><b>Bots ki speed</b><small>Offline aur test games mein</small></div><button class="pill" id="meSpeed" type="button">${APP.speed}</button></div></div>`}`;
   const bm=$('meBody');
   $('meName').addEventListener('input',e=>{D.name=e.target.value;});
@@ -798,6 +800,8 @@ function renderMe(){
   const jn=$('meJn');if(jn)jn.addEventListener('input',e=>{ME.jn=e.target.value.replace(/\D/g,'').slice(0,2);e.target.value=ME.jn;bm.querySelector('.jprev').innerHTML=jerseySVG(ME.jc,ME.jn||'7');});
   const ju=$('meJUse');if(ju)ju.addEventListener('click',()=>{D.icon=`jer:${ME.jc}:${ME.jn||'7'}`;renderMe();});
   const ph=$('mePhoto');if(ph)ph.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=c.height=160;const k=Math.min(im.width,im.height);c.getContext('2d').drawImage(im,(im.width-k)/2,(im.height-k)/2,k,k,0,0,160,160);D.icon='img:'+c.toDataURL('image/jpeg',.85);renderMe();};im.onerror=()=>toast('Ye photo khul nahi rahi. Koi aur chuno.','them');im.src=rd.result;};rd.readAsDataURL(f);});
+  const mm=$('meMic');if(mm){const show=()=>{const t={granted:'✅ Allowed',denied:'⛔ Blocked',prompt:'Abhi poocha nahi',unknown:'Pata nahi',error:'Mic nahi mila'}[MIC.state]||'';$('meMicTxt').textContent=`Voice chat ke liye · ${t}`;mm.textContent=MIC.state==='granted'?'Theek hai':MIC.state==='denied'?'Theek karo':'Allow karo';};
+    micStatus().then(show);mm.addEventListener('click',async()=>{if(MIC.state==='granted'){toast('Mic allowed hai 🎙');return;}await ensureMic();show();});}
   const sp=$('meSpeed');if(sp)sp.addEventListener('click',()=>{const k=Object.keys(SPEEDS);APP.speed=k[(k.indexOf(APP.speed)+1)%k.length];try{localStorage.setItem('dp-speed',APP.speed);}catch(e){}sp.textContent=APP.speed;});
   $('meSave').addEventListener('click',()=>{
     const n=D.name.trim();
@@ -1899,12 +1903,50 @@ async function voiceOnToken(m){
   finally{ VOICE.connecting=false; }
 }
 function voiceLeave(){const r=VOICE.room;VOICE.room=null;VOICE.joinedFor=null;if(r)r.disconnect();$('voiceAudio').innerHTML='';voiceLights([]);}
+/* ---- mic permission: explain first, then ask; help to fix when blocked ---- */
+const MIC={state:'unknown'};   // granted | denied | prompt | unknown
+async function micStatus(){
+  try{ const r=await navigator.permissions.query({name:'microphone'}); MIC.state=r.state; r.onchange=()=>{MIC.state=r.state;voiceBars();}; }
+  catch(e){ let ok=null; try{ok=localStorage.getItem('dp-micok');}catch(_){} if(MIC.state==='unknown'&&ok) MIC.state='granted'; }
+  return MIC.state;
+}
+async function askMic(){
+  try{ const st=await navigator.mediaDevices.getUserMedia({audio:true}); st.getTracks().forEach(t=>t.stop()); MIC.state='granted'; try{localStorage.setItem('dp-micok','1');}catch(e){} return true; }
+  catch(e){ MIC.state=(e&&(e.name==='NotAllowedError'||e.name==='SecurityError'))?'denied':'error'; return false; }
+}
+// Resolves true when the mic can be used. Shows our explanation before the phone's own popup.
+async function ensureMic(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ toast('Is browser mein mic nahi chal sakta. Chrome ya Safari use karo.','them'); return false; }
+  await micStatus();
+  if(MIC.state==='granted') return true;
+  if(MIC.state==='denied'){ micHelp(); return false; }
+  return new Promise(res=>openSheet(`<h2>🎙 Mic chahiye</h2><p>Table pe dosto se baat karne ke liye. Agle step mein phone poochega, tab <b>Allow</b> dabana.</p>
+      <p class="muted" style="font-size:12.5px">Mic sirf tab chalta hai jab tum <b>On</b> chuno ya <b>Dabake bolo</b> dabao. Kabhi bhi <b>Off</b> kar sakte ho.</p>
+      <button class="cta" data-act="go" type="button">Theek hai, aage badho</button><button class="cta ghost" data-act="no" type="button">Abhi nahi</button>`,
+    {go:async()=>{closeSheet();const ok=await askMic();if(!ok)micHelp();else toast('Mic ready hai 🎙');voiceBars();res(ok);},no:()=>{closeSheet();res(false);}}));
+}
+function micHelp(){
+  const ua=navigator.userAgent,ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1),android=/Android/.test(ua);
+  const app=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  let steps;
+  if(ios&&app) steps=['iPhone ki <b>Settings</b> kholo','<b>Apps → Safari</b> (purane iPhone mein seedha <b>Safari</b>)','<b>Microphone</b> pe tap karke <b>Ask</b> ya <b>Allow</b> chuno','Dehla Pakad app poori band karke dobara kholo'];
+  else if(ios) steps=['Safari ke address bar mein <b>aA</b> pe tap karo','<b>Website Settings</b> kholo','<b>Microphone</b> ko <b>Allow</b> karo','Page reload karo'];
+  else if(android&&app) steps=['Home screen pe Dehla Pakad icon ko <b>dabake rakho</b>','<b>App info</b> kholo','<b>Permissions → Microphone → Allow</b>','App band karke dobara kholo'];
+  else if(android) steps=['Address bar mein 🔒 ya settings icon pe tap karo','<b>Permissions</b> kholo','<b>Microphone</b> ko <b>Allow</b> karo','Page reload karo'];
+  else steps=['Address bar mein 🔒 icon pe click karo','<b>Microphone</b> ko <b>Allow</b> karo','Page reload karo'];
+  openSheet(`<div class="sheethead"><h2>🎙 Mic band hai</h2><button class="pill" data-act="close" type="button">Close</button></div>
+    <p>Phone ne is site ka mic block kiya hai. Aise chalu karo:</p><ol>${steps.map(x=>`<li>${x}</li>`).join('')}</ol>
+    <p class="muted" style="font-size:12px">Phone ke version ke hisaab se naam thode alag ho sakte hain.${android?' Agar phir bhi na chale: phone Settings → Apps → Chrome → Permissions → Microphone → Allow.':''}</p>
+    <button class="cta" data-act="retry" type="button">Maine allow kar diya, dobara try karo</button><button class="cta ghost" data-act="reload" type="button">Page reload karo</button>`,
+  {retry:async()=>{const ok=await askMic();if(ok){closeSheet();toast('Mic ready hai 🎙');voiceBars();}else toast('Abhi bhi band hai. Upar wale steps karke reload karo.','them');},reload:()=>location.reload()});
+}
+
 async function applyMic(hold){
   const r=VOICE.room,st=NET.state;
   if(!r||!st||st.me<0) return;
   const on=APP.voice.mic==='Open'||(APP.voice.mic==='PTT'&&!!hold);
   try{ await r.localParticipant.setMicrophoneEnabled(on); }
-  catch(e){ APP.voice.mic='Off'; voiceBars(); toast('Mic ki permission chahiye. Browser settings mein mic allow karo.','them'); }
+  catch(e){ APP.voice.mic='Off'; await micStatus(); if(MIC.state!=='granted') MIC.state='denied'; voiceBars(); micHelp(); }
 }
 function applyVolumes(){const r=VOICE.room;if(!r)return;r.remoteParticipants.forEach(p=>p.setVolume(APP.voice.speaker&&!VOICE.muted.has(p.identity)?1:0));}
 function unlockAudio(){if(VOICE.room)VOICE.room.startAudio().catch(()=>{});}
@@ -1921,15 +1963,20 @@ function mountVoiceReal(host){
   const watching=st.me<0,r=VOICE.room;
   const status=r?(r.canPlaybackAudio?'':'<button class="pill on" data-v="unlock" type="button">🔈 Awaaz chalu karo</button>'):'<span class="note">Voice jud raha hai…</span>';
   const seg=(k,l)=>`<button type="button" class="${V.mic===k?'on':''}" data-mic="${k}">${l}</button>`;
+  const blocked=!watching&&MIC.state==='denied';
   host.innerHTML=`<div class="voice">${watching?'<span class="note" style="margin:0">👀 Sirf sun sakte ho</span>':`<div class="micseg" role="group" aria-label="Mic">${seg('Open','🎙 On')}${seg('Off','🔇 Off')}${seg('PTT','✋ Push to talk')}</div>`}
     <button class="pill" data-v="spk" type="button" aria-label="Speaker">${V.speaker?'🔈':'🔇'}</button>${status}</div>
-    ${!watching&&V.mic==='PTT'?'<button class="ptt-big" data-v="talk" type="button">✋ Dabake bolo</button>':''}`;
+    ${blocked?'<button class="micwarn" data-v="fix" type="button">🎙 Mic blocked hai · Theek karo</button>':''}
+    ${!watching&&!blocked&&V.mic==='PTT'?'<button class="ptt-big" data-v="talk" type="button">✋ Dabake bolo</button>':''}`;
   const q=k=>host.querySelector(`[data-v="${k}"]`);
   if(q('unlock'))q('unlock').addEventListener('click',()=>{unlockAudio();setTimeout(voiceBars,300);});
-  host.querySelectorAll('[data-mic]').forEach(b=>b.addEventListener('click',()=>{unlockAudio();V.mic=b.dataset.mic;try{localStorage.setItem('dp-mic',V.mic);}catch(e){}applyMic(false);voiceBars();
+  if(q('fix'))q('fix').addEventListener('click',micHelp);
+  host.querySelectorAll('[data-mic]').forEach(b=>b.addEventListener('click',async()=>{unlockAudio();const want=b.dataset.mic;
+    if(want!=='Off'&&!(await ensureMic())){V.mic='Off';voiceBars();return;}
+    V.mic=want;try{localStorage.setItem('dp-mic',V.mic);}catch(e){}applyMic(false);voiceBars();
     toast(V.mic==='PTT'?'Push to talk: button dabake bolo':V.mic==='Open'?'Mic on: sab sun rahe hain':'Mic off');}));
   const t=q('talk');
-  if(t){const down=e=>{e.preventDefault();unlockAudio();VOICE.holding=true;t.classList.add('hold');$('youLab').classList.add('talk');applyMic(true);},
+  if(t){const down=e=>{e.preventDefault();unlockAudio();if(MIC.state!=='granted'){ensureMic();return;}VOICE.holding=true;t.classList.add('hold');$('youLab').classList.add('talk');applyMic(true);},
     up=()=>{if(!VOICE.holding)return;VOICE.holding=false;t.classList.remove('hold');$('youLab').classList.remove('talk');applyMic(false);};
     t.addEventListener('pointerdown',down);t.addEventListener('pointerup',up);t.addEventListener('pointerleave',up);t.addEventListener('pointercancel',up);
     t.addEventListener('contextmenu',e=>e.preventDefault());}
