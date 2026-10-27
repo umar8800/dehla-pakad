@@ -147,4 +147,4 @@ setInterval(() => {
   }
 }, 25_000);
 
-server.listen(PORT, () => console.log(`Dehla Pakad listening on ${PORT}`));
+server.listen(PORT, () => console.log(`Dehla Pakad listening on ${PORT} · voice ${Room.voiceReady ? 'ON' : 'OFF (LiveKit keys missing)'}`));
