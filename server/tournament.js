@@ -2,6 +2,7 @@
 // semi-finals (or a straight final with 3 teams). Each match is a locked Room.
 const { Room, TEAM_PRESETS } = require('./room');
 const db = require('./db');
+const fcode = require('./fcode');
 
 const BOT_NAMES = ['Zara', 'Imran', 'Bilal', 'Ayesha', 'Hamza', 'Sana', 'Faisal', 'Noor', 'Danish', 'Hira', 'Kabir', 'Mehak'];
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -314,7 +315,7 @@ class Tournament {
     return {
       t: 'tour', code: this.code, phase: this.phase, isHost: host, hostName: hostP ? hostP.name : '', settings: this.settings,
       meId: me ? me.id : null, myTeam: me && me.team !== null ? me.team : -1, watching: !me,
-      players: this.players.map(p => ({ id: p.id, name: p.name, icon: icon(p), team: p.team, want: p.want, bot: p.bot, connected: !!p.connected, you: !!me && p === me })),
+      players: this.players.map(p => ({ id: p.id, fc: p.bot ? null : fcode(p.pid), name: p.name, icon: icon(p), team: p.team, want: p.want, bot: p.bot, connected: !!p.connected, you: !!me && p === me })),
       teams: this.teams.map(t => ({ idx: t.idx, name: t.name, ids: t.ids })),
       matches: this.matches.map(m => ({ ...m })),
       champion: this.champion, claimed: !!me && this.claims.some(c => c.id === me.id),

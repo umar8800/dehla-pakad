@@ -6,6 +6,7 @@ const { WebSocketServer } = require('ws');
 const { Room } = require('./room');
 const { Tournament } = require('./tournament');
 const db = require('./db');
+const fcode = require('./fcode');
 const { AccessToken } = require('livekit-server-sdk');
 
 // Voice chat (LiveKit). Switched on only when all three keys are set on the server.
@@ -20,6 +21,7 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
 const rooms = new Map();   // code -> Room (friends tables and tournament matches)
 const tours = new Map();   // code -> Tournament
 const clients = new Set();
+const online = new Map();  // pid -> client (latest connection)
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -83,6 +85,23 @@ async function rankings(pid) {
   };
 }
 
+// ---------- friends ----------
+function whereJoinable(c) {
+  if (c.room && !c.room.locked && c.room.phase === 'lobby') return { kind: 'table', code: c.room.code };
+  if (c.tour && c.tour.phase === 'lobby') return { kind: 'tour', code: c.tour.code };
+  return null;
+}
+async function friendsView(pid) {
+  const [friends, played] = await Promise.all([db.friendsOf(pid), db.playedWith(pid)]);
+  const ids = new Set(friends.map(f => f.pid));
+  const row = p => { const o = online.get(p.pid); return { fc: p.fcode || fcode(p.pid), name: p.name, icon: rankIcon(p.icon), online: !!o, where: o ? whereJoinable(o) : null }; };
+  return {
+    t: 'friends', fc: fcode(pid),
+    list: friends.map(row).sort((a, b) => b.online - a.online),
+    suggest: played.filter(p => p.pid !== pid && !ids.has(p.pid)).slice(0, 12).map(row),
+  };
+}
+
 wss.on('connection', ws => {
   const client = { ws, pid: null, name: 'Player', icon: '🙂', room: null, tour: null };
   clients.add(client);
@@ -98,7 +117,8 @@ wss.on('connection', ws => {
       if (typeof m.pid !== 'string' || m.pid.length < 8 || m.pid.length > 64) return err('Profile theek nahi hai');
       client.pid = m.pid;
       Object.assign(client, cleanProfile(m));
-      db.upsertPlayer(client.pid, client.name, client.icon);
+      online.set(client.pid, client);
+      db.upsertPlayer(client.pid, client.name, client.icon, fcode(client.pid));
       // Rejoin the tournament and/or table this player was already part of.
       for (const t of tours.values()) if (t.byPid(client.pid)) { client.tour = t; t.join(client); break; }
       for (const r of rooms.values()) if (r.seatOf(client.pid) >= 0 && !(r.match && r.phase === 'final')) { client.room = r; r.join(client); return; }
@@ -178,7 +198,7 @@ wss.on('connection', ws => {
         return;
       case 'profile':
         Object.assign(client, cleanProfile(m));
-        db.upsertPlayer(client.pid, client.name, client.icon);
+        db.upsertPlayer(client.pid, client.name, client.icon, fcode(client.pid));
         if (room) { const i = room.seatOf(client.pid); if (i >= 0) { Object.assign(room.seats[i], { name: client.name, icon: client.icon }); room.sendAvatars(); room.broadcast(); } }
         if (tour) { const p = tour.byPid(client.pid); if (p) { p.name = client.name; p.icon = client.icon; tour.broadcast(); } }
         return;
@@ -208,11 +228,45 @@ wss.on('connection', ws => {
       case 'rank':
         rankings(client.pid).then(send);
         return;
+      // ---------- friends ----------
+      case 'friends':
+        friendsView(client.pid).then(send);
+        return;
+      case 'friendAdd': {
+        const fc = String(m.fc || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+        db.findByFcode(fc).then(async p => {
+          if (!p) return err(`Code ${fc || '?'} wala player nahi mila`);
+          if (p.pid === client.pid) return err('Ye toh tumhara apna code hai 🙂');
+          await db.addFriend(client.pid, p.pid);
+          send({ t: 'toast', text: `${p.name} ab tumhare dost hain 🤝` });
+          send(await friendsView(client.pid));
+          const o = online.get(p.pid);
+          if (o) { o.ws.send(JSON.stringify({ t: 'toast', text: `${client.name} ne tumhe dost banaya 🤝` })); o.ws.send(JSON.stringify(await friendsView(p.pid))); }
+        });
+        return;
+      }
+      case 'friendRemove': {
+        const fc = String(m.fc || '').toUpperCase();
+        db.findByFcode(fc).then(async p => { if (p) await db.removeFriend(client.pid, p.pid); send(await friendsView(client.pid)); });
+        return;
+      }
+      case 'invite': {                                  // in-app invite to a friend who is online
+        const where = whereJoinable(client);
+        if (!where) return err('Pehle table ya tournament lobby kholo');
+        db.findByFcode(String(m.fc || '').toUpperCase()).then(p => {
+          const o = p && online.get(p.pid);
+          if (!o) return err(`${p ? p.name : 'Dost'} abhi online nahi hai. WhatsApp se bulao.`);
+          o.ws.send(JSON.stringify({ t: 'invite', from: client.name, icon: rankIcon(client.icon), ...where }));
+          send({ t: 'toast', text: `${p.name} ko invite bhej diya` });
+        });
+        return;
+      }
     }
   });
 
   ws.on('close', () => {
     clients.delete(client);
+    if (client.pid && online.get(client.pid) === client) online.delete(client.pid);
     if (client.room && client.pid) client.room.disconnect(client.pid);
     if (client.tour && client.pid) client.tour.disconnect(client.pid);
   });

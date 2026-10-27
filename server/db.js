@@ -20,12 +20,54 @@ async function call(path, opts = {}) {
   } catch (e) { console.error('db', path.split('?')[0], e.message); return null; }
 }
 
-const upsertPlayer = (pid, name, icon) => call('players?on_conflict=pid', {
-  method: 'POST', headers: { prefer: 'resolution=merge-duplicates,return=minimal' },
-  body: JSON.stringify({ pid, name, icon: icon && icon.length > 60_000 ? null : icon, updated_at: new Date().toISOString() }),
-});
+// Without a database (local testing) players and friends live in memory.
+const mem = { players: new Map(), links: new Set(), played: new Map() };
 
-const bumpStats = rows => rows.length ? call('rpc/bump_stats', { method: 'POST', body: JSON.stringify({ rows }) }) : null;
+const upsertPlayer = (pid, name, icon, fcode) => {
+  const ic = icon && icon.length > 60_000 ? null : icon;
+  if (!enabled) { mem.players.set(pid, { pid, name, icon: ic, fcode }); return Promise.resolve(true); }
+  return call('players?on_conflict=pid', {
+    method: 'POST', headers: { prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ pid, name, icon: ic, fcode, updated_at: new Date().toISOString() }),
+  });
+};
+
+const bumpStats = rows => {
+  if (!enabled) { for (const r of rows) { const set = mem.played.get(r.pid) || new Set(); (r.friends || []).forEach(f => set.add(f)); mem.played.set(r.pid, set); } return null; }
+  return rows.length ? call('rpc/bump_stats', { method: 'POST', body: JSON.stringify({ rows }) }) : null;
+};
+
+// ---------- friends ----------
+const PCOLS = 'pid,name,icon,fcode';
+async function findByFcode(fc) {
+  if (!enabled) return [...mem.players.values()].find(p => p.fcode === fc) || null;
+  return ((await call(`players?fcode=eq.${encodeURIComponent(fc)}&select=${PCOLS}`)) || [])[0] || null;
+}
+async function addFriend(a, b) {
+  if (!enabled) { mem.links.add(a + '|' + b); mem.links.add(b + '|' + a); return true; }
+  return call('friend_links?on_conflict=a,b', { method: 'POST', headers: { prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify([{ a, b }, { a: b, b: a }]) });
+}
+async function removeFriend(a, b) {
+  if (!enabled) { mem.links.delete(a + '|' + b); mem.links.delete(b + '|' + a); return true; }
+  await call(`friend_links?a=eq.${encodeURIComponent(a)}&b=eq.${encodeURIComponent(b)}`, { method: 'DELETE' });
+  return call(`friend_links?a=eq.${encodeURIComponent(b)}&b=eq.${encodeURIComponent(a)}`, { method: 'DELETE' });
+}
+async function playersByPid(pids) {
+  if (!pids.length) return [];
+  if (!enabled) return pids.map(p => mem.players.get(p)).filter(Boolean);
+  return (await call(`players?pid=in.(${pids.map(p => '"' + p.replace(/"/g, '') + '"').join(',')})&select=${PCOLS}`)) || [];
+}
+async function friendsOf(pid) {
+  let ids;
+  if (!enabled) ids = [...mem.links].filter(k => k.startsWith(pid + '|')).map(k => k.slice(pid.length + 1));
+  else ids = ((await call(`friend_links?a=eq.${encodeURIComponent(pid)}&select=b&order=created_at.desc`)) || []).map(r => r.b);
+  return playersByPid(ids);
+}
+async function playedWith(pid) {
+  if (!enabled) return playersByPid([...(mem.played.get(pid) || [])]);
+  const me = ((await call(`players?pid=eq.${encodeURIComponent(pid)}&select=friends`)) || [])[0];
+  return playersByPid((me && me.friends || []).slice(-40));
+}
 
 // Snapshots are written at most every 2 seconds per table/tournament.
 const pending = new Map();
@@ -54,4 +96,4 @@ const COLS = 'pid,name,icon,tw,finals,tours,tables_w,tables_p,games,kot_given,ko
 const allPlayers = async () => (await call(`players?select=${COLS}&order=tw.desc,finals.desc,kot_given.desc,kot_taken.asc&limit=2000`)) || [];
 const getPlayer = async pid => ((await call(`players?pid=eq.${encodeURIComponent(pid)}&select=${COLS}`)) || [])[0] || null;
 
-module.exports = { enabled, upsertPlayer, bumpStats, saveSnapshot, deleteSnapshot, loadSnapshots, insertTournament, insertClaim, claimsFor, allPlayers, getPlayer };
+module.exports = { enabled, findByFcode, addFriend, removeFriend, friendsOf, playedWith, upsertPlayer, bumpStats, saveSnapshot, deleteSnapshot, loadSnapshots, insertTournament, insertClaim, claimsFor, allPlayers, getPlayer };

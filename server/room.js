@@ -2,6 +2,7 @@
 // (fixed teams, points scoring). Also handles watchers, bots and reconnecting.
 const { Game, team } = require('./engine');
 const db = require('./db');
+const fcode = require('./fcode');
 
 const TURN_MS = +process.env.TURN_MS || 60_000;          // each human turn
 const RESOLVE_MS = +process.env.RESOLVE_MS || 1_500;    // pause to show a finished trick
@@ -374,7 +375,7 @@ class Room {
       watchers: [...this.watchers.values()].map(w => w.name),
       match: this.match && { tourCode: this.match.tourCode, stage: this.match.stage, round: this.match.round, readyLeft: this.phase === 'ready' ? Math.max(0, this.readyDeadline - now) : 0 },
       settings: this.settings, teamNames: this.teamNames,
-      seats: this.seats.map(s => s && { name: s.name, icon: (s.icon || '').startsWith('img:') ? 'img' : s.icon, bot: !!s.bot, connected: !!s.connected }),
+      seats: this.seats.map(s => s && { name: s.name, icon: (s.icon || '').startsWith('img:') ? 'img' : s.icon, bot: !!s.bot, connected: !!s.connected, fc: s.bot ? null : fcode(s.pid) }),
       table: this.table && { kot: this.table.kot, dehle: this.table.dehle, played: this.table.played, elapsed: now - this.table.start, dealer: this.table.dealer, history: this.table.history, match: this.table.match || null },
       game: g && this.phase === 'play' ? {
         hand: i >= 0 ? g.hands[i] : [], counts: g.hands.map(h => h.length), trick: g.trick, pileN: g.pile.length,

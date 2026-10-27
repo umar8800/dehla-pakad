@@ -110,6 +110,12 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .counter b{display:block;font-family:var(--f-display);font-size:26px;font-variant-numeric:tabular-nums}
 .counter span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
 .codebox.invite{flex-wrap:wrap;gap:10px}.invbtns{display:flex;gap:8px;flex-wrap:wrap}.pill.wa{background:#25D366;color:#06301a;border-color:#25D366;font-weight:800}
+.fr{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}.fr:first-child{border-top:none}
+.fr .ic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:22px;background:rgba(246,238,226,.07);position:relative;flex:none}
+.fr .ic i{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;background:#62d3b1;border:2px solid #1a1225}
+.fr .nm{flex:1;min-width:0}.fr .nm b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fr .nm small{color:var(--muted);font-size:12px}
+.fr .acts{display:flex;gap:6px;flex:none}.pill.sm{padding:6px 10px;font-size:12.5px;min-height:32px}
+.mycode{font-family:var(--f-display,inherit);font-size:30px;font-weight:800;letter-spacing:.12em;color:var(--brass)}
 .lteams{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.lteams>*{min-width:0}
 .lteam{border:1px solid var(--line);border-radius:14px;padding:10px;background:rgba(0,0,0,.2)}
 .lteam.mine{border-color:var(--us)}
@@ -236,7 +242,7 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .smallmode b{display:block;font-size:15px} .smallmode span{display:block;color:var(--muted);font-size:12.5px} .smallmode i{font-style:normal;color:var(--brass);font-size:20px}
 #scr-home,#scr-rank,#scr-me{padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
 .pagehead{margin:4px 0 14px} .pagehead h2{font-size:26px} .pagehead small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:15;max-width:520px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);background:rgba(22,15,32,.95);border-top:1px solid var(--line);
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:15;max-width:520px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(22,15,32,.95);border-top:1px solid var(--line);
   padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px));padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
 .tabbar button{border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700;color:var(--muted);height:52px;justify-content:center;border-radius:12px}
 .tabbar button span{font-size:20px;line-height:1}
@@ -621,6 +627,10 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 </section>
 
 <!-- ============ RANKING ============ -->
+<section class="screen" id="scr-friends" hidden>
+  <div class="pagehead"><h2>Dost</h2><small>Dost banao, unhe table pe bulao</small></div>
+  <div class="stack-v" id="frBody"></div>
+</section>
 <section class="screen" id="scr-rank" hidden>
   <div class="pagehead"><h2>Ranking</h2><small>Tournament wins se ranking</small></div>
   <div class="stack-v" id="rkBody"></div>
@@ -628,6 +638,7 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 
 <nav class="tabbar" id="tabbar" hidden>
   <button type="button" data-nav="home"><span>🃏</span>Home</button>
+  <button type="button" data-nav="friends"><span>👥</span>Dost</button>
   <button type="button" data-nav="rank"><span>🏆</span>Ranking</button>
   <button type="button" data-nav="me"><span class="navav" id="navAv"></span>Profile</button>
 </nav>
@@ -775,7 +786,7 @@ function openSheet(html,acts={},locked=false){
 function closeSheet(){$('overlay').innerHTML='';}
 
 /* ================= profile, home, nav ================= */
-const NAV_SCREENS={'scr-home':'home','scr-rank':'rank','scr-me':'me'};
+const NAV_SCREENS={'scr-home':'home','scr-friends':'friends','scr-rank':'rank','scr-me':'me'};
 const ME={draft:null,set:'Cricket',onboard:false,jc:JERSEY_COLORS[0],jn:'7'};
 const _show=show;
 show=function(id){_show(id);const tb=$('tabbar'),k=NAV_SCREENS[id];tb.hidden=!k||(id==='scr-me'&&ME.onboard);
@@ -849,7 +860,7 @@ function goHome(){
   show('scr-home');
 }
 $('homeMe').addEventListener('click',()=>openMe(false));
-$('tabbar').addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(!b)return;const k=b.dataset.nav;if(k==='home')goHome();if(k==='rank')openRanking();if(k==='me')openMe(false);});
+$('tabbar').addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(!b)return;const k=b.dataset.nav;if(k==='home')goHome();if(k==='rank')openRanking();if(k==='friends')openFriends();if(k==='me')openMe(false);});
 function joinSheet(kind){
   openSheet(`<div class="sheethead"><h2>${kind==='tour'?'Tournament':'Table'} join karo</h2><button class="pill" data-act="close" type="button">Close</button></div>
     <p class="muted" style="margin:0 0 10px">Host ne jo code bheja hai, woh likho.</p>
@@ -1401,14 +1412,94 @@ function inviteMsg(kind,code,prize){
 }
 function inviteBox(label,code){
   return `<div class="codebox invite"><div><p class="lab" style="margin:0 0 2px">${label}</p><b>DP-${code}</b><small class="muted" style="display:block;font-size:11.5px;margin-top:2px">${esc(inviteURL(code).replace(/^https?:\/\//,''))}</small></div>
-    <div class="invbtns"><button class="pill wa" type="button" data-inv="wa">WhatsApp</button><button class="pill" type="button" data-inv="more">Share / Copy</button></div></div>`;
+    <div class="invbtns"><button class="pill wa" type="button" data-inv="wa">WhatsApp</button><button class="pill" type="button" data-inv="more">Share / Copy</button><button class="pill" type="button" data-inv="friends">👥 Dost</button></div></div>`;
 }
 function bindInvite(root,msg){
-  const wa=root.querySelector('[data-inv=wa]'),more=root.querySelector('[data-inv=more]');
+  const wa=root.querySelector('[data-inv=wa]'),more=root.querySelector('[data-inv=more]'),fr=root.querySelector('[data-inv=friends]');
+  if(fr)fr.addEventListener('click',()=>friendsInviteSheet(msg));
   if(wa)wa.addEventListener('click',()=>{window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');});
   if(more)more.addEventListener('click',async()=>{
     try{if(navigator.share){await navigator.share({text:msg});return;}}catch(e){if(e&&e.name==='AbortError')return;}
     try{await navigator.clipboard.writeText(msg.replace(/\*/g,''));toast('Invite copy ho gaya. Kahin bhi paste karo.');}catch(e){toast('Code bata do: '+msg.match(/DP-\d+/)[0]);}});
+}
+/* ================= friends ================= */
+const FR={data:null,sheetMsg:null};
+const waNums=()=>{try{return JSON.parse(localStorage.getItem('dp-wa')||'{}');}catch(e){return {};}};
+const setWaNum=(fc,n)=>{const m=waNums();if(n)m[fc]=n;else delete m[fc];try{localStorage.setItem('dp-wa',JSON.stringify(m));}catch(e){}};
+const friendURL=fc=>`${location.origin}/f/${fc}`;
+function myInvite(){
+  const st=NET.state,T=TOUR.state;
+  if(st&&st.phase==='lobby'&&!st.match&&NET.follow) return {kind:'table',code:st.code,msg:inviteMsg('table',st.code)};
+  if(T&&T.phase==='lobby'&&!T.watching) return {kind:'tour',code:T.code,msg:inviteMsg('tour',T.code,T.settings.prize)};
+  return null;
+}
+const generalMsg=()=>`🃏 *Dehla Pakad* khelein?\nFriends ke saath Mindi Coat, voice chat ke saath 🎙\n\nTap karke kholo 👇\n${location.origin}`;
+function openWA(fc,msg){
+  const n=fc&&waNums()[fc];
+  window.open((n?`https://wa.me/${n}`:'https://wa.me/')+'?text='+encodeURIComponent(msg),'_blank');
+}
+function waNumberSheet(f,msg){
+  const cur=waNums()[f.fc]||'';
+  openSheet(`<h2>${esc(f.name)} ka WhatsApp</h2><p>Number sirf tumhare phone pe save hoga. Phir invite seedha ${esc(f.name)} ki chat mein khulega.</p>
+    <input class="input" id="waNum" inputmode="tel" autocomplete="off" placeholder="+91 98765 43210" value="${cur?'+'+cur:''}">
+    <button class="cta" data-act="save" type="button" style="margin-top:12px">Save karke WhatsApp kholo</button>
+    ${msg?'<button class="cta ghost" data-act="nonum" type="button">Number ke bina bhejo (contact chuno)</button>':''}
+    ${cur?'<button class="cta ghost" data-act="del" type="button">Number hatao</button>':''}`,{
+    save:()=>{let v=($('waNum').value||'').replace(/\D/g,'');if(v.length===10)v='91'+v;if(v.length<11||v.length>15){toast('Number country code ke saath likho, jaise +91…','them');return;}
+      setWaNum(f.fc,v);closeSheet();if(msg)openWA(f.fc,msg);else{toast('Number save ho gaya');renderFriends();}},
+    nonum:()=>{closeSheet();openWA(null,msg);},
+    del:()=>{setWaNum(f.fc,null);closeSheet();renderFriends();toast('Number hata diya');}});
+}
+function waFriend(f,msg){ if(waNums()[f.fc]) openWA(f.fc,msg); else waNumberSheet(f,msg); }
+function openFriends(){stopSim();clearTimer();G.token++;renderFriends();show('scr-friends');netSend({t:'friends'});}
+function onFriends(m){FR.data=m;if(!$('scr-friends').hidden)renderFriends();if(FR.sheetMsg&&$('overlay').querySelector('#frSheet'))friendsInviteSheet(FR.sheetMsg);}
+function friendRow(f,acts){
+  const st=f.online?(f.where?`🟢 ${f.where.kind==='tour'?'Tournament':'Table'} lobby mein · DP-${f.where.code}`:'🟢 Online'):'Offline';
+  return `<div class="fr"><span class="ic">${av(f.icon)}${f.online?'<i></i>':''}</span><div class="nm"><b>${esc(f.name)}</b><small>${st}</small></div><div class="acts">${acts}</div></div>`;
+}
+function renderFriends(){
+  const D=FR.data,inv=myInvite();
+  if(!D){$('frBody').innerHTML=`<div class="panel"><p class="muted" style="margin:0">${NET.connected?'Dost aa rahe hain…':'Dost dekhne ke liye internet chahiye.'}</p></div>`;return;}
+  const nums=waNums();
+  const list=D.list.map(f=>friendRow(f,
+    (f.where&&!inv?`<button class="pill on sm" type="button" data-fjoin="${f.where.code}">Join</button>`:'')+
+    (inv&&f.online?`<button class="pill on sm" type="button" data-finv="${f.fc}">Bulao</button>`:'')+
+    `<button class="pill wa sm" type="button" data-fwa="${f.fc}" aria-label="WhatsApp">${nums[f.fc]?'WA':'WA +'}</button><button class="pill sm" type="button" data-fmore="${f.fc}" aria-label="Aur">⋯</button>`)).join('');
+  const sug=D.suggest.map(f=>friendRow(f,`<button class="pill sm" type="button" data-fadd="${f.fc}">+ Dost</button>`)).join('');
+  $('frBody').innerHTML=`
+  <div class="panel"><p class="lab">Tumhara friend code</p><div class="row"><span class="mycode">${D.fc}</span><button class="pill wa" type="button" id="frShare">WhatsApp pe bhejo</button></div>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">Dost ye link kholega toh tum dono turant dost ban jaoge.</p></div>
+  <div class="panel"><p class="lab">Code se dost banao</p><div class="row" style="gap:8px"><input class="input" id="frCode" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Jaise: K7M2QX" style="text-transform:uppercase;letter-spacing:.1em;font-weight:800"><button class="pill on" type="button" id="frAdd">Add</button></div></div>
+  ${inv?`<div class="panel" style="border-color:rgba(242,179,63,.5)"><b>Tum DP-${inv.code} ki lobby mein ho</b><small style="display:block;color:var(--muted);margin-top:2px">Online dost ko "Bulao" dabao, ya WhatsApp se bhejo.</small></div>`:''}
+  <div class="panel"><p class="lab">Mere dost (${D.list.length})</p>${list||'<p class="muted" style="margin:0;font-size:13px">Abhi koi dost nahi. Apna code bhejo ya neeche se add karo.</p>'}</div>
+  ${sug?`<div class="panel"><p class="lab">Saath khele hain</p>${sug}</div>`:''}`;
+  const q=$,find=fc=>D.list.find(f=>f.fc===fc)||D.suggest.find(f=>f.fc===fc);
+  q('frShare').addEventListener('click',()=>openWA(null,`🃏 Dehla Pakad pe mujhe dost banao!\nTap karo, hum dost ban jayenge 👇\n${friendURL(D.fc)}\n\nYa code daalo: *${D.fc}*`));
+  q('frAdd').addEventListener('click',()=>{const v=q('frCode').value.trim().toUpperCase();if(v.length!==6){toast('Code 6 letters ka hota hai','them');return;}netSend({t:'friendAdd',fc:v});q('frCode').value='';});
+  const b=$('frBody');
+  b.querySelectorAll('[data-fadd]').forEach(x=>x.addEventListener('click',()=>netSend({t:'friendAdd',fc:x.dataset.fadd})));
+  b.querySelectorAll('[data-finv]').forEach(x=>x.addEventListener('click',()=>{netSend({t:'invite',fc:x.dataset.finv});x.disabled=true;x.textContent='Bheja ✓';}));
+  b.querySelectorAll('[data-fjoin]').forEach(x=>x.addEventListener('click',()=>{NET.follow=true;TOUR.follow=true;netSend({t:'join',code:x.dataset.fjoin});}));
+  b.querySelectorAll('[data-fwa]').forEach(x=>x.addEventListener('click',()=>{const f=find(x.dataset.fwa);waFriend(f,inv?inv.msg:generalMsg());}));
+  b.querySelectorAll('[data-fmore]').forEach(x=>x.addEventListener('click',()=>{const f=find(x.dataset.fmore);
+    openSheet(`<h2>${esc(f.name)}</h2><p>Friend code: <b>${f.fc}</b></p><button class="cta ghost" data-act="num" type="button">${nums[f.fc]?'WhatsApp number badlo':'WhatsApp number jodo'}</button><button class="cta ghost" data-act="rm" type="button" style="color:var(--them)">Dost list se hatao</button><button class="cta ghost" data-act="close" type="button">Band karo</button>`,
+      {num:()=>waNumberSheet(f,null),rm:()=>{closeSheet();netSend({t:'friendRemove',fc:f.fc});toast(`${f.name} ko hata diya`);}});}));
+}
+function friendsInviteSheet(msg){
+  FR.sheetMsg=msg;
+  const D=FR.data,inv=myInvite(),nums=waNums();
+  if(!D){netSend({t:'friends'});}
+  const rows=D&&D.list.length?D.list.map(f=>friendRow(f,(f.online&&inv?`<button class="pill on sm" type="button" data-finv="${f.fc}">Bulao</button>`:'')+`<button class="pill wa sm" type="button" data-fwa="${f.fc}">${nums[f.fc]?'WhatsApp':'WA +'}</button>`)).join(''):`<p class="muted" style="font-size:13px">${D?'Abhi koi dost nahi. Dost tab mein jaake add karo.':'Dost aa rahe hain…'}</p>`;
+  openSheet(`<div id="frSheet"><h2>Dost ko bulao</h2><p>Online dost ko app mein invite jayega. Baaki ko WhatsApp pe.</p>${rows}<button class="cta ghost" data-act="close" type="button" style="margin-top:12px">Band karo</button></div>`,{});
+  const o=$('overlay'),find=fc=>D.list.find(f=>f.fc===fc);
+  o.querySelectorAll('[data-finv]').forEach(x=>x.addEventListener('click',()=>{netSend({t:'invite',fc:x.dataset.finv});x.disabled=true;x.textContent='Bheja ✓';}));
+  o.querySelectorAll('[data-fwa]').forEach(x=>x.addEventListener('click',()=>waFriend(find(x.dataset.fwa),msg)));
+}
+function onInvite(m){
+  try{navigator.vibrate&&navigator.vibrate([150,80,150]);}catch(e){}
+  openSheet(`<div style="text-align:center"><div style="font-size:44px">${av(m.icon)}</div><h2>${esc(m.from)} ne bulaya!</h2><p>${m.kind==='tour'?'Tournament':'Table'} DP-${m.code} pe khelne aao.</p></div>
+    <button class="cta" data-act="go" type="button">Join karo</button><button class="cta ghost" data-act="close" type="button">Abhi nahi</button>`,
+    {go:()=>{closeSheet();NET.follow=true;TOUR.follow=true;netSend({t:'join',code:m.code});}});
 }
 function tourPlayer(id){return TOUR.state.players.find(p=>p.id===id);}
 function renderTLobby(){
@@ -1640,6 +1731,7 @@ function netConnect(){
   NET.ws=ws;
   ws.onopen=()=>{NET.connected=true;NET.everConnected=true;NET.retry=0;$('netbar').hidden=true;
     ws.send(JSON.stringify({t:'hello',pid:NET.pid,name:APP.profile.name,icon:APP.profile.icon}));
+    if(NET.pendingFriend){ws.send(JSON.stringify({t:'friendAdd',fc:NET.pendingFriend}));NET.pendingFriend=null;}
     if(NET.want){ws.send(JSON.stringify(NET.want));NET.want=null;}};
   ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data);}catch(e){return;}netOnMessage(m);};
   ws.onclose=()=>{NET.connected=false;if(NET.state)$('netbar').hidden=false;setTimeout(netConnect,Math.min(8000,700*2**NET.retry++));};
@@ -1665,6 +1757,9 @@ function netOnMessage(m){
     if(TOUR.state&&$('scr-game').hidden&&$('scr-olobby').hidden){TOUR.follow=true;openTourScreen();}return;}
   if(m.t==='tourLeft'){TOUR.state=null;TOUR.follow=false;closeSheet();goHome();return;}
   if(m.t==='rank'){onRank(m);return;}
+  if(m.t==='friends'){onFriends(m);return;}
+  if(m.t==='invite'){onInvite(m);return;}
+  if(m.t==='toast'){toast(m.text);return;}
   if(m.t==='state'){
     const prev=NET.state;NET.state=m;
     if(NET.pendingJoin&&NET.pendingJoin!==m.code){const c=NET.pendingJoin;NET.pendingJoin=null;netSend({t:'join',code:c});}
@@ -2018,6 +2113,7 @@ function voiceMuteToggle(absSeat){
 }
 
 /* ================= boot ================= */
+(()=>{const fm=location.pathname.match(/^\/f\/([A-Za-z0-9]{6})\/?$/);if(fm){NET.pendingFriend=fm[1].toUpperCase();history.replaceState(null,'','/');}})();
 (()=>{const q=new URLSearchParams(location.search),pm=location.pathname.match(/^\/(?:dp-?)?(\d{4,6})\/?$/i),j=(q.get('join')||(pm?pm[1]:'')).replace(/\D/g,'');if(j){NET.pendingJoin=j;history.replaceState(null,'','/');}})();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 if(APP.profile){ goHome(); NET.follow=true; netConnect(); } else openMe(true);
