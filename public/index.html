@@ -1378,11 +1378,12 @@ function renderTLobby(){
   <div class="codebox"><div><p class="lab" style="margin:0 0 2px">Tournament code</p><b>DP-${T.code}</b></div><button class="pill" type="button" id="tlShare">Invite bhejo</button></div>
   <div class="counter"><div><b>${humans.length}</b><span>Players</span></div><div><b>${T.teams.length}</b><span>Teams</span></div><div><b>${solo.length}</b><span>Partner dhoond rahe</span></div></div>
   <div class="panel"><div class="row" style="margin-bottom:10px"><p class="lab" style="margin:0">Teams</p>${host?`<div class="seg"><button class="pill ${TOUR.arrange?'on':''}" id="tlArr" type="button">${TOUR.arrange?'Arrange: on':'Arrange'}</button><button class="pill" id="tlRand" type="button">Randomise</button></div>`:''}</div>
-    ${T.teams.length?`<div class="lteams">${T.teams.map(t=>`<div class="lteam ${me&&t.ids.includes(me.id)?'mine':''}"><button class="tedit" type="button" data-tn="${t.idx}" ${canName(t)?'':'disabled'}>${crest(t.name,t.idx,'sm')}<h3>${esc(t.name)}</h3>${canName(t)?'<span>✎</span>':''}</button>${t.ids.map(id=>chip(tourPlayer(id))).join('')}</div>`).join('')}</div>`:'<p class="muted" style="margin:0 0 8px;font-size:13px">Abhi koi team nahi bani.</p>'}
-    ${solo.length?`<p class="lab" style="margin:12px 0 8px">Partner dhoond rahe</p><div class="lteams">${solo.map(chip).join('')}</div>`:''}
+    ${T.teams.length?`<div class="lteams">${T.teams.map(t=>`<div class="lteam ${me&&t.ids.includes(me.id)?'mine':''}"><button class="tedit" type="button" data-tn="${t.idx}" ${canName(t)?'':'disabled'}>${crest(t.name,t.idx,'sm')}<h3>${esc(t.name)}</h3>${canName(t)?'<span>✎</span>':''}</button>${t.ids.map(id=>chip(tourPlayer(id))).join('')}${host&&t.ids.every(id=>{const q=tourPlayer(id);return q&&q.bot;})?`<button class="pill sm" type="button" data-rmt="${t.idx}" style="width:100%">Hatao</button>`:''}</div>`).join('')}</div>`:'<p class="muted" style="margin:0 0 8px;font-size:13px">Abhi koi team nahi bani.</p>'}
+    ${solo.length?`<p class="lab" style="margin:12px 0 8px">Partner dhoond rahe${host?' · 🤖 dabao toh bot partner':''}</p><div class="lteams">${solo.map(chip).join('')}</div>`:''}
     <p class="muted" style="font-size:12px;margin:8px 0 0">${TOUR.arrange?'Do players pe tap karo, unki team badal jayegi.':me&&me.team===null?'Jise partner banana hai us pe tap karo. Jab woh bhi tumhe chunega, team ban jayegi.':'Team ban gayi. Host Randomise ya Arrange se teams badal sakta hai.'}</p>
     ${me&&me.team!==null?'<button class="cta ghost" type="button" id="tlBreak" style="margin-top:10px">Team todo</button>':''}</div>
   <div class="panel"><div class="row"><div><b>Settings</b><small>${T.settings.gpm} game${T.settings.gpm>1?'s':''} har match · ${T.settings.perTeam} league matches har team · ${tourEst(T.settings.gpm,T.settings.perTeam)}</small></div>${host?'<button class="pill" id="tlSet" type="button">Badlo</button>':''}</div></div>
+  ${host?`<button class="cta ghost" id="tlBotTeam" type="button">🤖 Bot team jodo</button>`:''}
   ${host?`<button class="cta" id="tlStart" type="button" ${T.teams.length>=3&&!solo.length?'':'disabled'}>${T.teams.length<3?'Kam se kam 3 teams chahiye':solo.length?'Sabki team banni chahiye':'Tournament shuru karo'}</button>`:'<button class="cta" type="button" disabled>Host ke start karne ka intezaar…</button>'}
   <button class="cta ghost" id="tlLeave" type="button">Tournament chhodo</button>`;
   $('lbBody').innerHTML=html;
@@ -1393,6 +1394,8 @@ function renderTLobby(){
   if(q('tlArr'))q('tlArr').addEventListener('click',()=>{TOUR.arrange=!TOUR.arrange;TOUR.sel=null;renderTLobby();});
   if(q('tlRand'))q('tlRand').addEventListener('click',()=>netSend({t:'tour',a:'randomize'}));
   if(q('tlBreak'))q('tlBreak').addEventListener('click',()=>netSend({t:'tour',a:'leaveTeam'}));
+  if(q('tlBotTeam'))q('tlBotTeam').addEventListener('click',()=>netSend({t:'tour',a:'botTeam'}));
+  $('lbBody').querySelectorAll('[data-rmt]').forEach(b=>b.addEventListener('click',()=>netSend({t:'tour',a:'removeTeam',team:+b.dataset.rmt})));
   if(q('tlStart'))q('tlStart').addEventListener('click',()=>netSend({t:'tour',a:'start'}));
   if(q('tlSet'))q('tlSet').addEventListener('click',()=>tourSettingsSheet());
   q('tlLeave').addEventListener('click',()=>openSheet(`<h2>Tournament chhodna hai?</h2><p>Tum lobby se nikal jaoge.</p><button class="cta" data-act="leave" type="button">Haan, chhodo</button><button class="cta ghost" data-act="close" type="button">Nahi</button>`,{leave:()=>{closeSheet();netSend({t:'tourLeave'});}}));
@@ -1813,6 +1816,7 @@ function renderOLobby(){
       <div class="seg">${S.lengthType==='games'?[5,7,11].map(n=>`<button class="pill ${S.games===n?'on':''}" data-gn="${n}" type="button">${n} games</button>`).join(''):[[5,'5 min'],[30,'30 min'],[60,'1 ghanta']].map(([n,l])=>`<button class="pill ${S.minutes===n?'on':''}" data-mn="${n}" type="button">${l}</button>`).join('')}</div>
       <div class="row"><div><b>Dehle points dikhao</b><small>Sirf dikhenge, result Kot se hi hoga</small></div><button class="tog ${S.showDehle?'on':''}" id="olDehle" type="button" aria-label="Dehle points"></button></div>
       <div class="row"><div><b>Voice chat</b><small>Poori table ek saath sunti hai</small></div><button class="tog ${S.voice?'on':''}" id="olVoiceTog" type="button" aria-label="Voice chat"></button></div></div>`;
+    if(!full) html+=`<button class="cta ghost" type="button" id="olBots">🤖 Khali seats pe bots bithao</button>`;
     html+=`<button class="cta" type="button" id="olStart" ${full?'':'disabled'}>${full?'Table shuru karo':'Chaar players chahiye…'}</button>`;
   } else {
     html+=`<div class="panel"><p class="lab">Host ki settings</p><p style="margin:0;line-height:1.5">${S.lengthType==='games'?S.games+' games':S.minutes+' min'} · Sirf Kot count${S.showDehle?' · Dehle points dikhenge':''} · Voice ${S.voice?'on':'off'} · 60s timer</p></div>
@@ -1824,6 +1828,7 @@ function renderOLobby(){
     try{if(navigator.share){await navigator.share({title:'Dehla Pakad',text,url});return;}}catch(e){if(e&&e.name==='AbortError')return;}
     try{await navigator.clipboard.writeText(`${text}\n${url}`);toast('Invite copy ho gaya. WhatsApp pe paste karo.');}catch(e){toast(`Code: DP-${st.code}`);}});
   if(q('olRand'))q('olRand').addEventListener('click',()=>netSend({t:'host',a:'randomize'}));
+  if(q('olBots'))q('olBots').addEventListener('click',()=>netSend({t:'host',a:'fillBots'}));
   if(q('olStart'))q('olStart').addEventListener('click',()=>netSend({t:'host',a:'start'}));
   if(q('olSit'))q('olSit').addEventListener('click',()=>netSend({t:'sit'}));
   if(q('olVoiceTog'))q('olVoiceTog').addEventListener('click',()=>netSend({t:'host',a:'settings',settings:{voice:!S.voice}}));

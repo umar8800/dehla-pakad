@@ -149,6 +149,14 @@ class Tournament {
       if (ta) ta.ids[ta.ids.indexOf(a.id)] = b.id;
       if (tb) tb.ids[tb.ids.indexOf(b.id)] = a.id;
       [a.team, b.team] = [b.team, a.team];
+    } else if (m.a === 'botTeam') {
+      if (this.teams.length >= 12) return 'Bas, 12 teams kaafi hain';
+      const mk = () => { const used = this.players.map(x => x.name); const b = { id: this.nextId++, pid: null, name: shuffle(BOT_NAMES).find(n => !used.includes(n)) || 'Bot', icon: '🤖', ws: null, connected: true, team: null, want: null, bot: true }; this.players.push(b); return b; };
+      this.makeTeam(mk(), mk());
+    } else if (m.a === 'removeTeam') {
+      const t = this.teams[m.team];
+      if (!t || !t.ids.every(id => { const q = this.byId(id); return q && q.bot; })) return;
+      this.breakTeam(this.byId(t.ids[0]));
     } else if (m.a === 'botPartner') {
       const p = this.byId(m.id);
       if (!p || p.team !== null) return;

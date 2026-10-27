@@ -190,6 +190,8 @@ class Room {
     } else if (msg.a === 'addBot') {
       const i = this.seats.findIndex(s => !s);
       if (i >= 0) this.seats[i] = this.makeBot();
+    } else if (msg.a === 'fillBots') {
+      for (let i = 0; i < 4; i++) if (!this.seats[i]) this.seats[i] = this.makeBot();
     } else if (msg.a === 'removeBot') {
       if (this.seats[msg.seat] && this.seats[msg.seat].bot) this.seats[msg.seat] = null;
     } else if (msg.a === 'settings') {
