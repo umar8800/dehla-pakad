@@ -1,0 +1,15 @@
+{
+  "name": "Dehla Pakad",
+  "short_name": "Dehla Pakad",
+  "description": "Mindi Coat with our house rules. Play with friends.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1225",
+  "theme_color": "#1a1225",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

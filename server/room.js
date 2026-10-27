@@ -37,9 +37,9 @@ class Room {
     let i = this.seatOf(client.pid);
     if (i >= 0) {                                    // coming back
       Object.assign(this.seats[i], { ws: client.ws, connected: true, name: client.name, icon: client.icon });
-      this.event({ t: 'back', p: i });
       this.sendAvatars();
       this.broadcast();
+      this.event({ t: 'back', p: i });
       return null;
     }
     i = this.seats.findIndex(s => !s);
@@ -51,9 +51,9 @@ class Room {
     if (i < 0) return 'Table bhar gayi hai';
     this.seats[i] = { pid: client.pid, name: client.name, icon: client.icon, ws: client.ws, connected: true, bot: false, timeouts: 0 };
     if (!this.hostPid) this.hostPid = client.pid;
-    this.event({ t: 'joined', p: i });
     this.sendAvatars();
     this.broadcast();
+    this.event({ t: 'joined', p: i });
     return null;
   }
 
