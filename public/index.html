@@ -192,6 +192,11 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .netbar{position:fixed;left:0;right:0;top:0;z-index:40;background:#c8102e;color:#fff;font-weight:700;font-size:13px;text-align:center;padding:calc(8px + env(safe-area-inset-top,0px)) 16px 8px}
 .rmb{margin-left:auto;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:rgba(246,238,226,.12);font-size:11px;flex:none}
 .pchip[disabled]{cursor:default;opacity:1}
+.mine.watching .mylabel,.mine.watching .hand,.mine.watching .tbar{display:none}
+.watchbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 8px 14px;font-size:13px;color:var(--muted)}
+.watchbar b{color:var(--ink)}
+.watchnote{border:1px dashed rgba(246,238,226,.3);border-radius:14px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
+.reactpop button[data-mute]{background:rgba(229,38,63,.2)}
 .pv .baad{flex-direction:column;gap:2px;padding:4px 6px} .pv .baad .cr{font-size:15px}
 /* home, nav, profile */
 .homehead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 6px}
@@ -661,6 +666,7 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
     </div>
     <div class="tbar" id="tbar" hidden><i id="tbarFill"></i></div>
     <div class="hand" id="hand"></div>
+    <div class="watchbar" id="watchBar" hidden></div>
     <div id="myBubble"></div>
   </section>
 </section>
@@ -668,9 +674,11 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 <!-- ============ ONLINE TABLE LOBBY ============ -->
 <section class="screen" id="scr-olobby" hidden>
   <div class="bar"><button class="back" id="olBack" type="button" aria-label="Table chhodo">‹</button><div class="t"><h2>Friends ki table</h2><small id="olSub"></small></div></div>
+  <div class="voicewrap" id="olVoice" data-vhost></div>
   <div class="stack-v" id="olBody"></div>
 </section>
 <div class="netbar" id="netbar" hidden>Connection toot gaya. Jod rahe hain…</div>
+<div id="voiceAudio" hidden></div>
 <div id="overlay"></div>
 <div id="toastHost"></div>
 
@@ -795,7 +803,7 @@ function renderMe(){
   });
 }
 function goHome(){
-  stopSim(); clearTimer(); G.token++; clearJoins(); if(typeof NET!=='undefined')NET.follow=false;
+  stopSim(); clearTimer(); G.token++; clearJoins(); if(typeof NET!=='undefined'){NET.follow=false;if(VOICE.room)voiceLeave();}
   $('homeMe').innerHTML=`<span class="ic">${av(APP.profile.icon)}</span>${esc(APP.profile.name)}`;
   const k=APP.stats.kotTaken,g=APP.stats.kotGiven;
   $('homeGreet').textContent=`Salaam ${APP.profile.name}! ${g||k?`Ab tak ${g} Kot diye, ${k} khaye.`:'Aaj kiski Kot hogi?'}`;
@@ -1136,10 +1144,10 @@ function setupChrome(){
   const cfg=G.cfg;
   let x='';
   if(cfg.banner) x+=`<div class="banner-practice">${cfg.banner}</div>`;
-  if(cfg.voice) x+='<div id="gVoice"></div>';
+  if(cfg.voice) x+=cfg.online?'<div id="gVoice" data-vhost></div>':'<div id="gVoice"></div>';
   $('gExtra').innerHTML=x;
   $('youIc').innerHTML=av(cfg.icons[0]);
-  if(cfg.voice) mountVoice($('gVoice'),()=>$('youLab'));
+  if(cfg.voice){ if(cfg.online) mountVoiceReal($('gVoice')); else mountVoice($('gVoice'),()=>$('youLab')); }
   else $('youLab').classList.remove('talk');
 }
 function mountVoice(host,talkEl){
@@ -1165,7 +1173,7 @@ function render(){
   const slots=list=>{let h='';for(let i=0;i<4;i++){const c=list[i];h+=c?`<div class="slot10 got ${RED[c.s]?'red':''}">10<i>${SYM[c.s]}</i></div>`:'<div class="slot10"></div>';}return h;};
   const tnm=t=>cfg.teamNames?cfg.teamNames[t]:(t?'Woh':'Hum');
   const ci=cfg.crestIdx||[1,2];
-  const side=t=>`<div class="sb-t ${t?'them':'us'}">${crest(tnm(t),ci[t],'md')}<div class="sb-n"><b title="${esc(tnm(t))}">${esc(tnm(t))}</b><span>${t?'Opponent':'Tumhari team'}</span></div></div>`;
+  const side=t=>`<div class="sb-t ${t?'them':'us'}">${crest(tnm(t),ci[t],'md')}<div class="sb-n"><b title="${esc(tnm(t))}">${esc(tnm(t))}</b><span>${cfg.watching?(t?'Team B':'Team A'):t?'Opponent':'Tumhari team'}</span></div></div>`;
   const kk=t=>`<div class="sb-k ${t?'them':'us'}">${cfg.kotFor?kotBadge(cfg.kotFor(t),'lg',cfg.kotFor(1-t)):''}<div class="slots">${slots(G.tens[t])}</div></div>`;
   const ctr=cfg.center?cfg.center():{big:'',small:''};
   $('teams').innerHTML=`<div class="sb">${side(0)}<div class="sb-c"><b>${ctr.big}</b><small>${ctr.small}</small></div>${side(1)}${kk(0)}<div class="sb-vs">${G.tens[0].length}–${G.tens[1].length}<br>dehle</div>${kk(1)}</div>`;
@@ -1181,7 +1189,7 @@ function render(){
     el.classList.toggle('on',G.phase==='play'&&!G.resolving&&G.turn===p);
     const tags=(G.trumpSetter===p?'<span class="tag">Turup decide kiya</span>':'')+(G.streak.p===p?'<span class="tag need">Ek aur</span>':'');
     const bub=el.querySelector('.bubble');
-    el.innerHTML=`<button class="av" type="button" data-seat="${p}" aria-label="${G.names[p]} ko reaction bhejo">${av(G.icons[p])}<span class="cnt">${n}</span></button><div class="nm">${G.names[p]}</div><div class="role">${p===2?'Partner':'Opponent'}</div><div>${tags}</div>`;
+    el.innerHTML=`<button class="av" type="button" data-seat="${p}" aria-label="${G.names[p]} ko reaction bhejo">${av(G.icons[p])}<span class="cnt">${n}</span></button><div class="nm">${G.names[p]}</div><div class="role">${G.cfg.watching?esc(G.cfg.teamNames[p%2]):p===2?'Partner':'Opponent'}</div><div>${tags}</div>`;
     if(bub) el.appendChild(bub);
   }
   const c=$('center');c.className='center';
@@ -1231,7 +1239,8 @@ $('scr-game').addEventListener('click',e=>{
   const host=$('reactHost');
   if(!av){if(!e.target.closest('.reactpop'))host.innerHTML='';return;}
   const p=+av.dataset.seat,seat=$('seat'+p),tbl=document.querySelector('#scr-game .table').getBoundingClientRect(),r=seat.getBoundingClientRect();
-  host.innerHTML=`<div class="reactpop" style="left:${Math.max(0,Math.min(tbl.width-176,r.left-tbl.left-40))}px;top:${r.top-tbl.top+56}px">${REACTS.map(x=>`<button type="button" data-r="${x}">${x}</button>`).join('')}</div>`;
+  host.innerHTML=`<div class="reactpop" style="left:${Math.max(0,Math.min(tbl.width-176,r.left-tbl.left-40))}px;top:${r.top-tbl.top+56}px">${REACTS.map(x=>`<button type="button" data-r="${x}">${x}</button>`).join('')}${G.cfg&&G.cfg.online&&NET.state&&NET.state.voice?`<button type="button" data-mute="1" aria-label="Mute">${VOICE.muted.has('seat-'+nAbs(p))?'🔊':'🔇'}</button>`:''}</div>`;
+  const mb=host.querySelector('[data-mute]');if(mb)mb.addEventListener('click',ev=>{ev.stopPropagation();host.innerHTML='';voiceMuteToggle(nAbs(p));});
   host.querySelectorAll('[data-r]').forEach(b=>b.addEventListener('click',ev=>{ev.stopPropagation();host.innerHTML='';
     if(G.cfg&&G.cfg.online){netSend({t:'react',to:nAbs(p),emoji:b.dataset.r});return;}
     react(p,b.dataset.r);
@@ -1245,7 +1254,7 @@ setInterval(()=>{
     const chips=[...document.querySelectorAll('#lbBody .pchip[data-pid]')].filter(c=>c.dataset.pid!=='0');
     if(chips.length){const c=pick(chips);c.classList.add('talk');setTimeout(()=>c.classList.remove('talk'),rand(900,2000));}
   }
-  if(!G.cfg||!G.cfg.voice||$('scr-game').hidden) return;
+  if(!G.cfg||!G.cfg.voice||G.cfg.online||$('scr-game').hidden) return;
   if(Math.random()<.45){const p=APP.voice.channel==='Team'?2:pick([1,2,3]);const el=$('seat'+p);el.classList.add('talk');setTimeout(()=>el.classList.remove('talk'),rand(900,2200));}
 },1600);
 
@@ -1657,12 +1666,13 @@ function netConnect(){
   ws.onclose=()=>{NET.connected=false;if(NET.state)$('netbar').hidden=false;setTimeout(netConnect,Math.min(8000,700*2**NET.retry++));};
 }
 function netSend(o){if(NET.ws&&NET.ws.readyState===1)NET.ws.send(JSON.stringify(o));else{NET.want=o;netConnect();if(NET.everConnected)toast('Server se jod rahe hain…');}}
-const nRel=x=>NET.state?(x-NET.state.me+4)%4:x;
-const nAbs=r=>NET.state?(r+NET.state.me)%4:r;
+const nBase=()=>NET.state&&NET.state.me>=0?NET.state.me:0;
+const nRel=x=>(x-nBase()+4)%4;
+const nAbs=r=>(r+nBase())%4;
 const nName=i=>{const st=NET.state,s=st&&st.seats[i];return i===(st&&st.me)?'Tum':(s?s.name:'?');};
 const nNe=i=>i===(NET.state&&NET.state.me)?'Tumne':esc(nName(i))+' ne';
 const nIcon=i=>{const s=NET.state&&NET.state.seats[i];if(!s)return '🙂';return s.icon==='img'?(NET.imgs[i]||'🙂'):s.icon;};
-const nTeam=t=>{const st=NET.state,mt=st.me%2;return st.teamNames[t]||(t===mt?'Hum':'Woh');};
+const nTeam=t=>{const st=NET.state;if(st.me<0)return st.teamNames[t]||(t===0?'Team A':'Team B');return st.teamNames[t]||(t===st.me%2?'Hum':'Woh');};
 
 function netOnMessage(m){
   if(m.t==='hi'){ if(NET.pendingJoin){netSend({t:'join',code:NET.pendingJoin});NET.pendingJoin=null;} return; }
@@ -1675,8 +1685,9 @@ function netOnMessage(m){
   }
   if(m.t==='avatars'){NET.imgs=m.imgs.map(x=>x||null);if(NET.state)netRender();return;}
   if(m.t==='event'){netEvent(m.e);return;}
-  if(m.t==='error'){toast(esc(m.text),'them');return;}
-  if(m.t==='left'){NET.state=null;NET.follow=false;closeSheet();goHome();}
+  if(m.t==='voiceToken'){voiceOnToken(m);return;}
+  if(m.t==='error'){if(VOICE.connecting&&/Voice/.test(m.text)){VOICE.connecting=false;}toast(esc(m.text),'them');return;}
+  if(m.t==='left'){NET.state=null;NET.follow=false;voiceLeave();closeSheet();goHome();}
 }
 
 function netEvent(e){
@@ -1684,6 +1695,7 @@ function netEvent(e){
   const L=t=>{NET.logs.unshift(t);if(NET.logs.length>120)NET.logs.pop();};
   switch(e.t){
     case 'joined': if(e.p!==st.me) toast(`${esc(nName(e.p))} table pe aa gaya`); break;
+    case 'watching': toast(`👀 ${esc(e.name)} dekh raha hai`); break;
     case 'left': toast(`${esc(nName(e.p))} ne table chhodi`,'them'); break;
     case 'gone': toast(`${esc(nName(e.p))} ka connection gaya. Timer chalta rahega.`,'them'); break;
     case 'back': if(e.p!==st.me) toast(`${esc(nName(e.p))} wapas aa gaya`); break;
@@ -1711,7 +1723,7 @@ function netEvent(e){
 function netRender(){
   const st=NET.state;if(!st)return;
   const onTable=!$('scr-olobby').hidden||!$('scr-game').hidden;
-  if(st.phase==='lobby'){ renderOLobby(); if(NET.follow||onTable){closeSheet();show('scr-olobby');} return; }
+  if(st.phase==='lobby'){ renderOLobby(); if(NET.follow||onTable){closeSheet();show('scr-olobby');} voiceSync(); voiceBars(); return; }
   if(!(NET.follow||onTable)) return;
   onlineGame(st);
   if($('scr-game').hidden) show('scr-game');
@@ -1722,24 +1734,29 @@ function netRender(){
       {bot:()=>{closeSheet();netSend({t:'host',a:'replaceBot',seat:st.prompt});},no:()=>{closeSheet();netSend({t:'host',a:'dismissPrompt'});}});
   }
   if(st.prompt===null) NET.promptFor=null;
+  voiceSync(); voiceBars();
 }
 
 function onlineGame(st){
-  const me=st.me,mt=me%2,T=st.table,S=st.settings;
+  const me=st.me,base=me<0?0:me,mt=base%2,T=st.table,S=st.settings,watching=me<0;
   const names=[0,1,2,3].map(r=>esc(nName(nAbs(r)))),icons=[0,1,2,3].map(r=>nIcon(nAbs(r)));
   const holder=T&&T.kot.holder!==null?(T.kot.holder===mt?0:1):null;
-  const cfg={online:true,names,icons,teamNames:[nTeam(mt),nTeam(1-mt)],crestIdx:[1,2],timer:true,voice:false,human:true,
+  const cfg={online:true,names,icons,teamNames:[nTeam(mt),nTeam(1-mt)],crestIdx:[1,2],timer:!watching,voice:!!st.voice,human:true,watching,
     title:()=>`Friends ki table · DP-${st.code}`,
-    sub:()=>`${S.lengthType==='games'?`Game ${Math.min(T.played+1,S.games)}/${S.games}`:'Time wali table'} · Kot: ${holder===null?'kisi ke paas nahi':esc(cfg.teamNames[holder])+' '+T.kot.n}`,
+    sub:()=>`${S.lengthType==='games'?`Game ${Math.min(T.played+1,S.games)}/${S.games}`:'Time wali table'} · Kot: ${holder===null?'kisi ke paas nahi':esc(cfg.teamNames[holder])+' '+T.kot.n}${st.watchers.length?` · 👀 ${st.watchers.length}`:''}`,
     kotFor:t=>holder===t?T.kot.n:0,
     center:()=>{let tl;if(S.lengthType==='games')tl={big:`${Math.min(T.played+1,S.games)}/${S.games}`,small:'Game'};
       else{const left=Math.max(0,S.minutes*60000-T.elapsed-(Date.now()-NET.stateAt));tl={big:`${Math.floor(left/60000)}:${String(Math.floor(left%60000/1000)).padStart(2,'0')}`,small:`Baaki<br>Game ${T.played+1}`};}
       if(S.showDehle)tl.small+=`<br>${T.dehle[mt]}:${T.dehle[1-mt]} pts`;return tl;},
     onLeave:()=>openSheet(`<h2>Table chhodna hai?</h2><p>Tumhari jagah bot khelega. Wapas aao toh seat mil sakti hai.</p><button class="cta" data-act="leave" type="button">Haan, chhodo</button><button class="cta ghost" data-act="close" type="button">Nahi, khelte raho</button>`,{leave:()=>{closeSheet();NET.follow=false;netSend({t:'leave'});}})};
   NET.stateAt=Date.now();
-  const firstTime=NET.chromeKey!==st.code;
+  const firstTime=NET.chromeKey!==`${st.code}-${st.voice}-${me}`;
   G.cfg=cfg;G.names=names;G.icons=icons;G.logs=NET.logs;
-  if(firstTime){NET.chromeKey=st.code;setupChrome();}
+  if(firstTime){NET.chromeKey=`${st.code}-${st.voice}-${me}`;setupChrome();}
+  $('mine').classList.toggle('watching',watching);$('watchBar').hidden=!watching;
+  if(watching){const canSit=st.phase!=='lobby'&&st.seats.some(x=>x&&x.bot);
+    $('watchBar').innerHTML=`<span>👀 Tum dekh rahe ho. <b>${esc(nName(0))}</b> ke patte chhupe hain.</span>${canSit?'<button class="pill on" type="button" id="sitBtn">Seat lo</button>':''}`;
+    const sb=$('sitBtn');if(sb)sb.addEventListener('click',()=>netSend({t:'sit'}));}
   else $('youIc').innerHTML=av(icons[0]);
   const g=st.game;
   if(g){
@@ -1765,11 +1782,11 @@ function onlineGame(st){
 }
 function readyText(st){const hum=st.seats.filter(s=>s&&!s.bot&&s.connected).length;return `${st.ready.length}/${hum} ready · warna 25 sec mein khud shuru`;}
 function showOnlineResult(st){
-  const me=st.me,mt=me%2,T=st.table,K=T.kot,r=st.result;
+  const me=st.me,watching=me<0,mt=watching?0:me%2,T=st.table,K=T.kot,r=st.result;
   const holder=K.holder===null?null:(K.holder===mt?0:1),kt=r.kotTo===null?null:(r.kotTo===mt?0:1);
   const n0=esc(nTeam(mt)),n1=esc(nTeam(1-mt));
   const us=mt===0?r.a:r.b,them=mt===0?r.b:r.a;
-  if(kt===1)bump('kotGiven');if(kt===0)bump('kotTaken');
+  if(!watching){if(kt===1)bump('kotGiven');if(kt===0)bump('kotTaken');}
   let head,tone,line;
   if(kt===1){head='Kot!';tone='good';line=`${n0} ne chaaron dehle pakde. ${n1} ko Kot! Sharam karo.`;}
   else if(kt===0){head='Kot';tone='bad';line=`${n1} ne chaaron dehle pakde. ${n0} ko Kot.`;}
@@ -1779,11 +1796,11 @@ function showOnlineResult(st){
   if(st.phase==='result'){
     openSheet(`<div class="result ${tone}">${head}</div><p>${line}</p><div class="prio">${kotRow}
       <div class="prow r3"><div class="pl"><span class="pr">2</span><div><b>Is game</b><small>Dehle · haath</small></div></div><div class="pv"><span>${n0}</span><b>${us} · ${r.haath[mt]}</b></div><div class="pv"><span>${n1}</span><b>${them} · ${r.haath[1-mt]}</b></div></div></div>
-      ${hist}<button class="cta" data-act="ready" type="button" style="margin-top:16px">Agla game</button><p class="testnote" id="rdyN">${readyText(st)}</p>`,
-      {ready:b=>{netSend({t:'ready'});b.disabled=true;b.textContent='Baaki players ka intezaar…';}},true);
+      ${hist}${watching?'<button class="cta" data-act="close" type="button" style="margin-top:16px">Dekhte raho</button>':'<button class="cta" data-act="ready" type="button" style="margin-top:16px">Agla game</button>'}<p class="testnote" id="rdyN">${readyText(st)}</p>`,
+      {ready:b=>{netSend({t:'ready'});b.disabled=true;b.textContent='Baaki players ka intezaar…';}},!watching);
   } else {
     const draw=holder===null,won=holder===1,isHost=st.host===me;
-    bump('tablesP');if(won)bump('tablesW');
+    if(!watching){bump('tablesP');if(won)bump('tablesW');}
     openSheet(`<div class="result ${draw?'':won?'good':'bad'}">${draw?'Draw':won?'Table Win!':'Table Lose'}</div>
       <p>${draw?'Table khatam aur Kot kisi ke paas nahi. Isliye draw.':won?`${n1} ${K.n} Kot ke saath table se gaye. ${n0} Baadshah!`:`${n0} ${K.n} Kot ke saath table se gaye. ${n1} Baadshah.`}</p>
       <div class="prio">${kotRow}</div>${hist}
@@ -1794,26 +1811,29 @@ function showOnlineResult(st){
 }
 
 function renderOLobby(){
-  const st=NET.state,me=st.me,isHost=st.host===me,S=st.settings,full=st.seats.every(Boolean);
-  $('olSub').textContent=`Host: ${st.host===me?'Tum':st.seats[st.host]?st.seats[st.host].name:'?'} · ${st.seats.filter(Boolean).length}/4 players`;
+  const st=NET.state,me=st.me,base=me<0?0:me,isHost=me>=0&&st.host===me,S=st.settings,full=st.seats.every(Boolean),watching=me<0;
+  $('olSub').textContent=`Host: ${isHost?'Tum':st.seats[st.host]?st.seats[st.host].name:'?'} · ${st.seats.filter(Boolean).length}/4 players${st.watchers.length?` · 👀 ${st.watchers.length}`:''}`;
   const chip=i=>{const s=st.seats[i];
     if(!s) return isHost?`<button type="button" class="pchip empty ${NET.sel!==null?'sel':''}" data-seat="${i}">${NET.sel!==null?'Yahan rakho':'+ Bot bithao'}</button>`:`<div class="pchip empty">Khali seat</div>`;
     const sub=i===st.host?'Host':s.bot?'Bot':s.connected?'Friend':'Offline';
     return `<button type="button" class="pchip ${NET.sel===i?'sel':''}" data-seat="${i}" ${isHost?'':'disabled'}><span class="ic">${av(nIcon(i))}</span><div><b>${esc(s.name)}${i===me?' (Tum)':''}</b><small>${sub}</small></div>${isHost&&s.bot?`<span class="rmb" data-rm="${i}" aria-label="Bot hatao">✕</span>`:''}</button>`;};
-  const col=t=>`<div class="tcol ${t===me%2?'us':'them'}"><button class="tedit" type="button" data-tn="${t}" ${isHost||me%2===t?'':'disabled'}>${crest(nTeam(t),t===me%2?1:2,'sm')}<h3>${esc(nTeam(t))}</h3>${isHost||me%2===t?'<span>Naam ✎</span>':''}</button>${chip(t)}${chip(t+2)}</div>`;
+  const mine=t=>!watching&&me%2===t;
+  const col=t=>`<div class="tcol ${t===base%2?'us':'them'}"><button class="tedit" type="button" data-tn="${t}" ${isHost||mine(t)?'':'disabled'}>${crest(nTeam(t),t===base%2?1:2,'sm')}<h3>${esc(nTeam(t))}</h3>${isHost||mine(t)?'<span>Naam ✎</span>':''}</button>${chip(t)}${chip(t+2)}</div>`;
   const url=`${location.origin}/?join=${st.code}`;
-  let html=`<div class="codebox"><div><p class="lab" style="margin:0 0 2px">Table code</p><b>DP-${st.code}</b></div><button class="pill" type="button" id="olShare">Invite bhejo</button></div>`;
+  let html=watching?`<div class="watchnote"><span>👀 Tum dekh rahe ho.${st.seats.some(x=>!x)?' Ek seat khali hai.':''}</span>${st.seats.some(x=>!x)?'<button class="pill on" type="button" id="olSit">Seat lo</button>':''}</div>`:'';
+  html+=`<div class="codebox"><div><p class="lab" style="margin:0 0 2px">Table code</p><b>DP-${st.code}</b></div><button class="pill" type="button" id="olShare">Invite bhejo</button></div>`;
   html+=`<div class="panel"><div class="row" style="margin-bottom:10px"><p class="lab" style="margin:0">Teams</p>${isHost?'<button class="pill" type="button" id="olRand">Randomise</button>':''}</div>
-    <div class="teamsetup">${col(me%2)}${col(1-me%2)}</div>
+    <div class="teamsetup">${col(base%2)}${col(1-base%2)}</div>
     <p class="muted" style="font-size:12px;margin:4px 0 0">${isHost?'Do players pe tap karo unki jagah badalne ke liye. Khali seat pe bot bitha sakte ho.':'Host teams aur settings set karega.'}</p></div>`;
   if(isHost){
     html+=`<div class="panel stack-v"><div><p class="lab">Table kitni der</p><div class="seg">${['games','time'].map(k=>`<button class="pill ${S.lengthType===k?'on':''}" data-lt="${k}" type="button">${k==='games'?'Games':'Time'}</button>`).join('')}</div></div>
       <div class="seg">${S.lengthType==='games'?[5,7,11].map(n=>`<button class="pill ${S.games===n?'on':''}" data-gn="${n}" type="button">${n} games</button>`).join(''):[[5,'5 min'],[30,'30 min'],[60,'1 ghanta']].map(([n,l])=>`<button class="pill ${S.minutes===n?'on':''}" data-mn="${n}" type="button">${l}</button>`).join('')}</div>
-      <div class="row"><div><b>Dehle points dikhao</b><small>Sirf dikhenge, result Kot se hi hoga</small></div><button class="tog ${S.showDehle?'on':''}" id="olDehle" type="button" aria-label="Dehle points"></button></div></div>`;
+      <div class="row"><div><b>Dehle points dikhao</b><small>Sirf dikhenge, result Kot se hi hoga</small></div><button class="tog ${S.showDehle?'on':''}" id="olDehle" type="button" aria-label="Dehle points"></button></div>
+      <div class="row"><div><b>Voice chat</b><small>Sab ke saath ya sirf team ke saath baat karo</small></div><button class="tog ${S.voice?'on':''}" id="olVoiceTog" type="button" aria-label="Voice chat"></button></div></div>`;
     html+=`<button class="cta" type="button" id="olStart" ${full?'':'disabled'}>${full?'Table shuru karo':'Chaar players chahiye…'}</button>`;
   } else {
-    html+=`<div class="panel"><p class="lab">Host ki settings</p><p style="margin:0;line-height:1.5">${S.lengthType==='games'?S.games+' games':S.minutes+' min'} · Sirf Kot count${S.showDehle?' · Dehle points dikhenge':''} · 60s timer</p></div>
-      <button class="cta" type="button" disabled>Host ke start karne ka intezaar…</button>`;
+    html+=`<div class="panel"><p class="lab">Host ki settings</p><p style="margin:0;line-height:1.5">${S.lengthType==='games'?S.games+' games':S.minutes+' min'} · Sirf Kot count${S.showDehle?' · Dehle points dikhenge':''} · Voice ${S.voice?'on':'off'} · 60s timer</p></div>
+      <button class="cta" type="button" disabled>${watching?'Table shuru hone ka intezaar…':'Host ke start karne ka intezaar…'}</button>`;
   }
   $('olBody').innerHTML=html;
   const q=id=>$(id);
@@ -1822,6 +1842,8 @@ function renderOLobby(){
     try{await navigator.clipboard.writeText(`${text}\n${url}`);toast('Invite copy ho gaya. WhatsApp pe paste karo.');}catch(e){toast(`Code: DP-${st.code}`);}});
   if(q('olRand'))q('olRand').addEventListener('click',()=>netSend({t:'host',a:'randomize'}));
   if(q('olStart'))q('olStart').addEventListener('click',()=>netSend({t:'host',a:'start'}));
+  if(q('olSit'))q('olSit').addEventListener('click',()=>netSend({t:'sit'}));
+  if(q('olVoiceTog'))q('olVoiceTog').addEventListener('click',()=>netSend({t:'host',a:'settings',settings:{voice:!S.voice}}));
   if(q('olDehle'))q('olDehle').addEventListener('click',()=>netSend({t:'host',a:'settings',settings:{showDehle:!S.showDehle}}));
   $('olBody').querySelectorAll('[data-lt]').forEach(b=>b.addEventListener('click',()=>netSend({t:'host',a:'settings',settings:{lengthType:b.dataset.lt}})));
   $('olBody').querySelectorAll('[data-gn]').forEach(b=>b.addEventListener('click',()=>netSend({t:'host',a:'settings',settings:{games:+b.dataset.gn}})));
@@ -1836,6 +1858,85 @@ function renderOLobby(){
   }));
 }
 $('olBack').addEventListener('click',()=>openSheet(`<h2>Table chhodni hai?</h2><p>Tumhari seat khali ho jayegi.</p><button class="cta" data-act="leave" type="button">Haan, chhodo</button><button class="cta ghost" data-act="close" type="button">Nahi</button>`,{leave:()=>{closeSheet();NET.follow=false;netSend({t:'leave'});}}));
+
+/* ================= voice chat (LiveKit) ================= */
+const VOICE={room:null,channel:'table',connecting:false,joinedFor:null,muted:new Set(),holding:false,lib:null,fails:0};
+function loadLK(){
+  if(window.LivekitClient) return Promise.resolve(window.LivekitClient);
+  if(!VOICE.lib) VOICE.lib=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='/vendor/livekit-client.js';sc.onload=()=>res(window.LivekitClient);sc.onerror=()=>{VOICE.lib=null;rej(new Error('load'));};document.head.appendChild(sc);});
+  return VOICE.lib;
+}
+function voiceWanted(){const st=NET.state;return !!(st&&st.voice&&NET.follow&&(!$('scr-olobby').hidden||!$('scr-game').hidden));}
+function voiceSync(){
+  const st=NET.state;
+  if(!voiceWanted()){ if(VOICE.room||VOICE.joinedFor) voiceLeave(); return; }
+  const key=`${st.code}-${VOICE.channel}-${st.me<0?'w':st.me}`;
+  if(VOICE.joinedFor===key||VOICE.connecting) return;
+  if(VOICE.room) voiceLeave();
+  VOICE.connecting=true; VOICE.joinedFor=key;
+  netSend({t:'voiceToken',channel:VOICE.channel});
+}
+async function voiceOnToken(m){
+  try{
+    const LK=await loadLK();
+    const room=new LK.Room({adaptiveStream:true,dynacast:true,audioCaptureDefaults:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    room.on(LK.RoomEvent.TrackSubscribed,(track,pub,who)=>{if(track.kind==='audio'){const el=track.attach();el.dataset.who=who.identity;$('voiceAudio').appendChild(el);applyVolumes();}});
+    room.on(LK.RoomEvent.TrackUnsubscribed,track=>{track.detach().forEach(el=>el.remove());});
+    room.on(LK.RoomEvent.ActiveSpeakersChanged,sp=>voiceLights(sp));
+    room.on(LK.RoomEvent.ParticipantConnected,()=>applyVolumes());
+    room.on(LK.RoomEvent.AudioPlaybackStatusChanged,()=>voiceBars());
+    room.on(LK.RoomEvent.Disconnected,()=>{if(VOICE.room===room){VOICE.room=null;VOICE.joinedFor=null;voiceBars();setTimeout(voiceSync,3000);}});
+    await room.connect(m.url,m.token);
+    if(!voiceWanted()){room.disconnect();return;}
+    VOICE.room=room; VOICE.channel=m.channel;
+    VOICE.fails=0; await applyMic(false); applyVolumes(); voiceBars();
+  }catch(e){ VOICE.joinedFor=null; if(!VOICE.fails++) toast('Voice chat jud nahi paya. Peeche se try karte rahenge.','them'); setTimeout(voiceSync,Math.min(60000,5000*VOICE.fails)); }
+  finally{ VOICE.connecting=false; }
+}
+function voiceLeave(){const r=VOICE.room;VOICE.room=null;VOICE.joinedFor=null;if(r)r.disconnect();$('voiceAudio').innerHTML='';voiceLights([]);}
+async function applyMic(hold){
+  const r=VOICE.room,st=NET.state;
+  if(!r||!st||st.me<0) return;
+  const on=APP.voice.mic==='Open'||(APP.voice.mic==='PTT'&&!!hold);
+  try{ await r.localParticipant.setMicrophoneEnabled(on); }
+  catch(e){ APP.voice.mic='Off'; voiceBars(); toast('Mic ki permission chahiye. Browser settings mein mic allow karo.','them'); }
+}
+function applyVolumes(){const r=VOICE.room;if(!r)return;r.remoteParticipants.forEach(p=>p.setVolume(APP.voice.speaker&&!VOICE.muted.has(p.identity)?1:0));}
+function unlockAudio(){if(VOICE.room)VOICE.room.startAudio().catch(()=>{});}
+function voiceLights(speakers){
+  const ids=new Set(speakers.map(p=>p.identity)),st=NET.state;
+  for(const r of [1,2,3]){const el=$('seat'+r);if(el)el.classList.toggle('talk',!!st&&ids.has('seat-'+nAbs(r)));}
+  $('youLab').classList.toggle('talk',!!st&&st.me>=0&&ids.has('seat-'+st.me));
+  document.querySelectorAll('#olBody .pchip[data-seat]').forEach(c=>c.classList.toggle('talk',ids.has('seat-'+c.dataset.seat)));
+}
+function voiceBars(){ if(VOICE.holding) return; document.querySelectorAll('[data-vhost]').forEach(mountVoiceReal); }
+function mountVoiceReal(host){
+  const st=NET.state,V=APP.voice;
+  if(!st||!st.voice){host.innerHTML='';return;}
+  const watching=st.me<0,r=VOICE.room;
+  const status=r?(r.canPlaybackAudio?'':'<button class="pill on" data-v="unlock" type="button">🔈 Awaaz chalu karo</button>'):'<span class="note">Voice jud raha hai…</span>';
+  host.innerHTML=`<div class="voice">${watching?'<span class="note" style="margin:0">👀 Sirf sun sakte ho</span>':`<button class="pill" data-v="mode" type="button">${V.mic==='Open'?'🎙 Open mic':V.mic==='PTT'?'🎙 Push-to-talk':'🔇 Mic off'}</button>
+    ${V.mic==='PTT'?'<button class="pill ptt" data-v="talk" type="button">Dabake bolo</button>':''}`}
+    <button class="pill" data-v="spk" type="button" aria-label="Speaker">${V.speaker?'🔈':'🔇'}</button>
+    ${watching?'':`<button class="pill" data-v="ch" type="button">${VOICE.channel==='team'?'Sirf team':'Sab'}</button>`}${status}</div>`;
+  const q=k=>host.querySelector(`[data-v="${k}"]`);
+  if(q('unlock'))q('unlock').addEventListener('click',()=>{unlockAudio();setTimeout(voiceBars,300);});
+  if(q('mode'))q('mode').addEventListener('click',()=>{unlockAudio();V.mic=V.mic==='PTT'?'Open':V.mic==='Open'?'Off':'PTT';applyMic(false);voiceBars();
+    toast(V.mic==='PTT'?'Push-to-talk: button dabake bolo':V.mic==='Open'?'Open mic: sab sun rahe hain':'Mic band');});
+  const t=q('talk');
+  if(t){const down=e=>{e.preventDefault();unlockAudio();VOICE.holding=true;t.classList.add('hold');$('youLab').classList.add('talk');applyMic(true);},
+    up=()=>{if(!VOICE.holding)return;VOICE.holding=false;t.classList.remove('hold');$('youLab').classList.remove('talk');applyMic(false);};
+    t.addEventListener('pointerdown',down);t.addEventListener('pointerup',up);t.addEventListener('pointerleave',up);t.addEventListener('pointercancel',up);
+    t.addEventListener('contextmenu',e=>e.preventDefault());}
+  q('spk').addEventListener('click',()=>{unlockAudio();V.speaker=!V.speaker;applyVolumes();voiceBars();toast(V.speaker?'Speaker on':'Speaker off');});
+  if(q('ch'))q('ch').addEventListener('click',()=>{unlockAudio();VOICE.channel=VOICE.channel==='team'?'table':'team';voiceLeave();voiceSync();voiceBars();
+    toast(VOICE.channel==='table'?'Ab sab sun sakte hain':'Ab sirf tumhara partner sunega');});
+}
+function voiceMuteToggle(absSeat){
+  const id='seat-'+absSeat;
+  if(VOICE.muted.has(id))VOICE.muted.delete(id);else VOICE.muted.add(id);
+  applyVolumes();toast(`${esc(nName(absSeat))} ${VOICE.muted.has(id)?'mute':'unmute'} ho gaya`);
+}
 
 /* ================= boot ================= */
 (()=>{const q=new URLSearchParams(location.search),j=(q.get('join')||'').replace(/\D/g,'');if(j){NET.pendingJoin=j;history.replaceState(null,'','/');}})();

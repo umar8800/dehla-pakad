@@ -4,6 +4,12 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const { Room } = require('./room');
+const { AccessToken } = require('livekit-server-sdk');
+
+// Voice chat (LiveKit). Switched on only when all three keys are set on the server.
+const LK = { url: process.env.LIVEKIT_URL, key: process.env.LIVEKIT_API_KEY, secret: process.env.LIVEKIT_API_SECRET };
+Room.voiceReady = !!(LK.url && LK.key && LK.secret);
+const LK_CLIENT = path.join(__dirname, '..', 'node_modules', 'livekit-client', 'dist', 'livekit-client.umd.js');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -13,7 +19,11 @@ const rooms = new Map();
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
-  if (url.pathname === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end(`ok ${rooms.size} tables`); }
+  if (url.pathname === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end(`ok ${rooms.size} tables · voice ${Room.voiceReady ? 'on' : 'off'}`); }
+  if (url.pathname === '/vendor/livekit-client.js') {
+    res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'public, max-age=86400' });
+    return fs.createReadStream(LK_CLIENT).pipe(res);
+  }
   let file = path.normalize(path.join(PUBLIC, decodeURIComponent(url.pathname)));
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
   if (url.pathname === '/' || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(PUBLIC, 'index.html');
@@ -98,6 +108,21 @@ wss.on('connection', ws => {
           if (e && e !== 'follow') err(e);
         }
         return;
+      case 'sit':
+        if (room) { const e = room.sit(client); if (e) err(e); }
+        return;
+      case 'voiceToken': {
+        if (!room || !Room.voiceReady || !room.settings.voice) return err('Voice chat abhi band hai');
+        const seat = room.seatOf(client.pid), watching = room.watchers.has(client.pid);
+        if (seat < 0 && !watching) return;
+        // Two channels: the whole table, or just your team (partners only).
+        const channel = m.channel === 'team' && seat >= 0 ? `dp-${room.code}-team${seat % 2}` : `dp-${room.code}`;
+        const at = new AccessToken(LK.key, LK.secret, { identity: seat >= 0 ? `seat-${seat}` : `watch-${client.pid.slice(0, 10)}`, name: client.name, ttl: '6h' });
+        at.addGrant({ roomJoin: true, room: channel, canPublish: seat >= 0, canSubscribe: true });
+        at.toJwt().then(token => send({ t: 'voiceToken', url: LK.url, token, channel: m.channel === 'team' && seat >= 0 ? 'team' : 'table' }))
+          .catch(() => err('Voice shuru nahi ho paya'));
+        return;
+      }
       case 'ready':
         if (room) room.markReady(client.pid);
         return;

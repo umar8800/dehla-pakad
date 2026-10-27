@@ -15,7 +15,8 @@ class Room {
     this.seats = [null, null, null, null];
     this.hostPid = null;
     this.teamNames = ['', ''];
-    this.settings = { lengthType: 'games', games: 7, minutes: 30, showDehle: false };
+    this.settings = { lengthType: 'games', games: 7, minutes: 30, showDehle: false, voice: true };
+    this.watchers = new Map();   // pid -> { ws, name, icon }  people watching, not playing
     this.phase = 'lobby';
     this.table = null;
     this.game = null;
@@ -48,7 +49,14 @@ class Room {
       i = this.seats.findIndex(s => s && s.bot && s.forPid === client.pid);
       if (i < 0) i = this.seats.findIndex(s => s && s.bot);
     }
-    if (i < 0) return 'Table bhar gayi hai';
+    if (i < 0) {                                     // no seat: watch instead
+      this.watchers.set(client.pid, { ws: client.ws, name: client.name, icon: client.icon });
+      this.sendAvatars();
+      this.broadcast();
+      this.event({ t: 'watching', name: client.name });
+      return null;
+    }
+    this.watchers.delete(client.pid);
     this.seats[i] = { pid: client.pid, name: client.name, icon: client.icon, ws: client.ws, connected: true, bot: false, timeouts: 0 };
     if (!this.hostPid) this.hostPid = client.pid;
     this.sendAvatars();
@@ -57,7 +65,17 @@ class Room {
     return null;
   }
 
+  // A watcher takes an empty seat (lobby) or a bot's seat (during play).
+  sit(client) {
+    if (!this.watchers.has(client.pid)) return 'Tum pehle se khel rahe ho';
+    const free = this.seats.some(s => !s) || (this.phase !== 'lobby' && this.seats.some(s => s && s.bot));
+    if (!free) return 'Abhi koi seat khali nahi';
+    this.watchers.delete(client.pid);
+    return this.join(client);
+  }
+
   disconnect(pid) {
+    if (this.watchers.has(pid)) { this.watchers.delete(pid); this.broadcast(); return; }
     const i = this.seatOf(pid);
     if (i < 0) return;
     const s = this.seats[i];
@@ -69,6 +87,7 @@ class Room {
   }
 
   leave(pid) {
+    if (this.watchers.has(pid)) { this.watchers.delete(pid); this.broadcast(); this.checkEmpty(); return; }
     const i = this.seatOf(pid);
     if (i < 0) return;
     if (this.phase === 'lobby') this.seats[i] = null;
@@ -83,7 +102,7 @@ class Room {
   }
 
   checkEmpty() {
-    if (!this.humans().some(s => s.connected)) {
+    if (!this.humans().some(s => s.connected) && !this.watchers.size) {
       clearTimeout(this.timers.empty);
       this.timers.empty = setTimeout(() => { if (!this.humans().some(s => s.connected)) this.close(); }, 30 * 60_000);
     }
@@ -133,6 +152,7 @@ class Room {
       if ([5, 7, 11].includes(s.games)) this.settings.games = s.games;
       if ([5, 30, 60].includes(s.minutes)) this.settings.minutes = s.minutes;
       if (typeof s.showDehle === 'boolean') this.settings.showDehle = s.showDehle;
+      if (typeof s.voice === 'boolean') this.settings.voice = s.voice;
     } else if (msg.a === 'start') {
       if (this.seats.some(s => !s)) return 'Pehle chaaron seats bharo';
       return this.startTable();
@@ -232,9 +252,13 @@ class Room {
   }
 
   // ---------- messages ----------
+  listeners() {
+    return [...this.seats.filter(s => s && !s.bot && s.ws), ...this.watchers.values()].filter(s => s.ws && s.ws.readyState === 1);
+  }
+
   event(e) {
     const msg = JSON.stringify({ t: 'event', e });
-    for (const s of this.seats) if (s && !s.bot && s.ws && s.ws.readyState === 1) s.ws.send(msg);
+    for (const s of this.listeners()) s.ws.send(msg);
   }
 
   social(fromPid, msg) {
@@ -249,18 +273,19 @@ class Room {
   sendAvatars() {
     const imgs = this.seats.map(s => (s && typeof s.icon === 'string' && s.icon.startsWith('img:')) ? s.icon : null);
     const msg = JSON.stringify({ t: 'avatars', imgs });
-    for (const s of this.seats) if (s && !s.bot && s.ws && s.ws.readyState === 1) s.ws.send(msg);
+    for (const s of this.listeners()) s.ws.send(msg);
   }
 
   view(i) {
     const g = this.game, now = Date.now();
     return {
-      t: 'state', code: this.code, me: i, host: this.seatOf(this.hostPid), phase: this.phase,
+      t: 'state', code: this.code, me: i, host: this.seatOf(this.hostPid), phase: this.phase, voice: Room.voiceReady && this.settings.voice,
+      watchers: [...this.watchers.values()].map(w => w.name),
       settings: this.settings, teamNames: this.teamNames,
       seats: this.seats.map(s => s && { name: s.name, icon: (s.icon || '').startsWith('img:') ? 'img' : s.icon, bot: !!s.bot, connected: !!s.connected }),
       table: this.table && { kot: this.table.kot, dehle: this.table.dehle, played: this.table.played, elapsed: now - this.table.start, dealer: this.table.dealer, history: this.table.history },
       game: g && this.phase === 'play' ? {
-        hand: g.hands[i], counts: g.hands.map(h => h.length), trick: g.trick, pileN: g.pile.length,
+        hand: i >= 0 ? g.hands[i] : [], counts: g.hands.map(h => h.length), trick: g.trick, pileN: g.pile.length,
         trump: g.trump, trumpSetter: g.trumpSetter, streak: g.streak, tens: g.tens, turn: g.turn,
         resolving: g.resolving, winIdx: g.resolving ? g.winningIdx() : -1,
         timeLeft: this.deadline ? Math.max(0, this.deadline - now) : 0, trickNo: g.trickNo,
@@ -275,7 +300,12 @@ class Room {
       const s = this.seats[i];
       if (s && !s.bot && s.ws && s.ws.readyState === 1) s.ws.send(JSON.stringify(this.view(i)));
     }
+    if (this.watchers.size) {
+      const msg = JSON.stringify(this.view(-1));
+      for (const w of this.watchers.values()) if (w.ws && w.ws.readyState === 1) w.ws.send(msg);
+    }
   }
 }
 
+Room.voiceReady = false;
 module.exports = { Room, TURN_MS };

@@ -2,29 +2,30 @@
 const { spawn } = require('child_process');
 const WebSocket = require('ws');
 const PORT = 3999;
-const srv = spawn('node', ['server/index.js'], { env: { ...process.env, PORT, RESOLVE_MS: '5', TURN_MS: '400' }, stdio: 'inherit' });
+const srv = spawn('node', ['server/index.js'], { env: { ...process.env, PORT, RESOLVE_MS: '5', TURN_MS: '400', LIVEKIT_URL: 'wss://example.livekit.cloud', LIVEKIT_API_KEY: 'testkey', LIVEKIT_API_SECRET: 'testsecrettestsecrettestsecret12' }, stdio: 'inherit' });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const fail = m => { console.error('FAIL:', m); srv.kill(); process.exit(1); };
 
 function phone(n, opts = {}) {
   const ws = new WebSocket(`ws://localhost:${PORT}/ws`);
-  const P = { ws, n, state: null, events: [], errors: [] };
+  const P = { ws, n, state: null, events: [], errors: [], idle: !!opts.idle };
   ws.on('message', d => {
     const m = JSON.parse(d);
     if (m.t === 'state') {
       P.state = m;
       const g = m.game;
-      if (m.phase === 'play' && g && g.turn === m.me && !g.resolving && !opts.idle) {
+      if (m.phase === 'play' && g && g.turn === m.me && !g.resolving && !P.idle) {
         if (g.hand.length !== g.counts[m.me]) fail('hand/count mismatch');
         const led = g.trick.length ? g.trick[0].c.s : null;
         const legal = led && g.hand.some(c => c.s === led) ? g.hand.filter(c => c.s === led) : g.hand;
         const c = legal[Math.floor(Math.random() * legal.length)];
         setTimeout(() => ws.send(JSON.stringify({ t: 'play', id: c.id })), 2);
       }
-      if (m.phase === 'result' && !m.ready.includes(m.me)) setTimeout(() => ws.send(JSON.stringify({ t: 'ready' })), 2);
+      if (m.phase === 'result' && m.me >= 0 && !m.ready.includes(m.me)) setTimeout(() => ws.send(JSON.stringify({ t: 'ready' })), 2);
     }
     if (m.t === 'event') P.events.push(m.e);
     if (m.t === 'error') P.errors.push(m.text);
+    if (m.t === 'voiceToken') P.voice = m;
   });
   P.send = o => ws.send(JSON.stringify(o));
   P.open = new Promise(r => ws.on('open', r));
@@ -49,6 +50,25 @@ function phone(n, opts = {}) {
   A.send({ t: 'host', a: 'settings', settings: { games: 5 } });
   A.send({ t: 'host', a: 'teamName', team: 0, name: 'Kot Killers' });
   A.send({ t: 'host', a: 'start' });
+  // Voice: a seated player gets a pass for the table channel and one for their team channel.
+  A.send({ t: 'voiceToken', channel: 'table' }); await sleep(150);
+  if (!A.voice || !A.voice.token || A.voice.channel !== 'table') fail('no table voice token');
+  A.send({ t: 'voiceToken', channel: 'team' }); await sleep(150);
+  if (A.voice.channel !== 'team') fail('no team voice token');
+  // A fifth person joins a full table and watches without seeing any hand.
+  const E = phone('E', { idle: true }); await E.open;
+  E.send({ t: 'hello', pid: 'test-pid-E-xxxx', name: 'PE', icon: '🐼' }); await sleep(50);
+  E.send({ t: 'join', code }); await sleep(250);
+  if (!E.state || E.state.me !== -1) fail('watcher not seated as watcher');
+  if (E.state.game && E.state.game.hand.length) fail('watcher can see a hand');
+  if (!A.state.watchers.includes('PE')) fail('players do not see the watcher');
+  E.send({ t: 'sit' }); await sleep(100);
+  if (!E.errors.some(x => /khali/.test(x))) fail('watcher sat on a full table');
+  // C leaves mid-table: a bot takes the seat, then the watcher takes it from the bot.
+  C.send({ t: 'leave' }); await sleep(150);
+  E.send({ t: 'sit' }); await sleep(200);
+  if (E.state.me < 0) fail('watcher could not take the bot seat');
+  E.idle = false;
   // D never plays: their turns must time out and auto-play the highest card.
   const t0 = Date.now();
   while (A.state.phase !== 'final' && Date.now() - t0 < 60000) await sleep(100);
