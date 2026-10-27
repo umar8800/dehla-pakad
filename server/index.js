@@ -145,6 +145,14 @@ wss.on('connection', ws => {
         if (room) { const e = room.sit(client); if (e) err(e); }
         return;
       case 'voiceToken': {
+        if (m.ctx === 'tour') {
+          if (!tour || !Room.voiceReady) return err('Voice chat abhi band hai');
+          const p = tour.byPid(client.pid);
+          const at = new AccessToken(LK.key, LK.secret, { identity: p ? `tp-${p.id}` : `twatch-${client.pid.slice(0, 10)}`, name: client.name, ttl: '6h' });
+          at.addGrant({ roomJoin: true, room: `dp-t${tour.code}`, canPublish: !!p, canSubscribe: true });
+          at.toJwt().then(token => send({ t: 'voiceToken', url: LK.url, token })).catch(() => err('Voice shuru nahi ho paya'));
+          return;
+        }
         if (!room || !Room.voiceReady || !room.settings.voice) return err('Voice chat abhi band hai');
         const seat = room.seatOf(client.pid), watching = room.watchers.has(client.pid);
         if (seat < 0 && !watching) return;
@@ -172,10 +180,10 @@ wss.on('connection', ws => {
         if (tour) tour.leave(client.pid);
         const code = newCode();
         const t = new Tournament(code, client.pid, tourDeps);
-        if (m.settings) t.act(client.pid, { a: 'settings', settings: m.settings });
         tours.set(code, t);
         client.tour = t;
         t.join(client);
+        if (m.settings) t.act(client.pid, { a: 'settings', settings: m.settings });
         return;
       }
       case 'tour':
