@@ -37,6 +37,31 @@ const bumpStats = rows => {
   return rows.length ? call('rpc/bump_stats', { method: 'POST', body: JSON.stringify({ rows }) }) : null;
 };
 
+// ---------- accounts (username + PIN) ----------
+const ACOLS = 'pid,name,icon,username,pin_hash';
+async function findByUsername(u) {
+  if (!enabled) return [...mem.players.values()].find(p => p.username === u) || null;
+  return ((await call(`players?username=eq.${encodeURIComponent(u)}&select=${ACOLS}`)) || [])[0] || null;
+}
+async function accountOf(pid) {
+  if (!enabled) return mem.players.get(pid) || null;
+  return ((await call(`players?pid=eq.${encodeURIComponent(pid)}&select=${ACOLS}`)) || [])[0] || null;
+}
+// Returns false when the username is already taken.
+async function createAccount(rec) {
+  if (!enabled) {
+    if ([...mem.players.values()].some(p => p.username === rec.username)) return false;
+    mem.players.set(rec.pid, { ...rec }); return true;
+  }
+  const r = await call('players', { method: 'POST', headers: { prefer: 'return=minimal' }, body: JSON.stringify({ ...rec, updated_at: new Date().toISOString() }) });
+  return !!r;
+}
+const setIcon = (pid, icon) => {
+  const ic = icon && icon.length > 60_000 ? null : icon;
+  if (!enabled) { const p = mem.players.get(pid); if (p) p.icon = ic; return Promise.resolve(true); }
+  return call(`players?pid=eq.${encodeURIComponent(pid)}`, { method: 'PATCH', headers: { prefer: 'return=minimal' }, body: JSON.stringify({ icon: ic, updated_at: new Date().toISOString() }) });
+};
+
 // ---------- friends ----------
 const PCOLS = 'pid,name,icon,fcode';
 async function findByFcode(fc) {
@@ -96,4 +121,4 @@ const COLS = 'pid,name,icon,tw,finals,tours,tables_w,tables_p,games,kot_given,ko
 const allPlayers = async () => (await call(`players?select=${COLS}&order=tw.desc,finals.desc,kot_given.desc,kot_taken.asc&limit=2000`)) || [];
 const getPlayer = async pid => ((await call(`players?pid=eq.${encodeURIComponent(pid)}&select=${COLS}`)) || [])[0] || null;
 
-module.exports = { enabled, findByFcode, addFriend, removeFriend, friendsOf, playedWith, upsertPlayer, bumpStats, saveSnapshot, deleteSnapshot, loadSnapshots, insertTournament, insertClaim, claimsFor, allPlayers, getPlayer };
+module.exports = { enabled, findByUsername, accountOf, createAccount, setIcon, findByFcode, addFriend, removeFriend, friendsOf, playedWith, upsertPlayer, bumpStats, saveSnapshot, deleteSnapshot, loadSnapshots, insertTournament, insertClaim, claimsFor, allPlayers, getPlayer };

@@ -7,6 +7,11 @@ const { Room } = require('./room');
 const { Tournament } = require('./tournament');
 const db = require('./db');
 const fcode = require('./fcode');
+const crypto = require('crypto');
+// 4-digit PINs are hashed with a per-player salt; 5 wrong tries lock that username for 10 minutes.
+const hashPin = pin => { const salt = crypto.randomBytes(8).toString('hex'); return salt + ':' + crypto.scryptSync(pin, salt, 32).toString('hex'); };
+const checkPin = (pin, stored) => { const [salt, h] = stored.split(':'); try { return crypto.timingSafeEqual(Buffer.from(h, 'hex'), crypto.scryptSync(pin, salt, 32)); } catch { return false; } };
+const fails = new Map();
 const { AccessToken } = require('livekit-server-sdk');
 
 // Voice chat (LiveKit). Switched on only when all three keys are set on the server.
@@ -110,21 +115,62 @@ wss.on('connection', ws => {
   const send = o => ws.readyState === 1 && ws.send(JSON.stringify(o));
   const err = text => send({ t: 'error', text });
 
+  const queue = [];
   ws.on('message', raw => {
     let m;
     try { m = JSON.parse(raw); } catch { return; }
-    if (m.t === 'hello') {
-      if (typeof m.pid !== 'string' || m.pid.length < 8 || m.pid.length > 64) return err('Profile theek nahi hai');
-      client.pid = m.pid;
-      Object.assign(client, cleanProfile(m));
-      online.set(client.pid, client);
-      db.upsertPlayer(client.pid, client.name, client.icon, fcode(client.pid));
-      // Rejoin the tournament and/or table this player was already part of.
+    if (client.authing) return queue.length < 50 && queue.push(m);   // wait for hello to finish
+    handle(m);
+  });
+  const flush = () => { client.authing = false; while (queue.length && !client.authing) handle(queue.shift()); };
+
+  async function hello(m) {
+    if (typeof m.pid !== 'string' || m.pid.length < 8 || m.pid.length > 64) return err('Profile theek nahi hai');
+    const acct = await db.accountOf(m.pid);
+    if (!acct || !acct.username) {
+      // Only test runs without a database may play without an account.
+      if (db.enabled || m.needAccount) return send({ t: 'needAccount' });
+    }
+    client.pid = m.pid;
+    Object.assign(client, cleanProfile(m));
+    if (acct && acct.username) { client.name = acct.name; if (acct.icon && !m.icon) client.icon = acct.icon; }
+    online.set(client.pid, client);
+    if (acct && acct.username) db.setIcon(client.pid, client.icon); else db.upsertPlayer(client.pid, client.name, client.icon, fcode(client.pid));
+    send({ t: 'me', name: client.name, username: acct ? acct.username : null });
+    // Rejoin the tournament and/or table this player was already part of.
       for (const t of tours.values()) if (t.byPid(client.pid)) { client.tour = t; t.join(client); break; }
       for (const r of rooms.values()) if (r.seatOf(client.pid) >= 0 && !(r.match && r.phase === 'final')) { client.room = r; r.join(client); return; }
-      if (!client.tour) send({ t: 'hi' });
-      return;
+    if (!client.tour) send({ t: 'hi' });
+  }
+
+  async function account(m) {
+    const u = String(m.username || '').trim();
+    const key = u.toLowerCase();
+    if (!/^[A-Za-z0-9_]{3,14}$/.test(u)) return send({ t: 'authErr', text: 'Username 3–14 letters/numbers ka ho (space nahi)' });
+    if (m.t === 'checkName') { const p = await db.findByUsername(key); return send({ t: 'nameFree', username: u, free: !p }); }
+    if (!/^\d{4}$/.test(String(m.pin || ''))) return send({ t: 'authErr', text: 'PIN 4 numbers ka hona chahiye' });
+    if (m.t === 'register') {
+      const pid = 'p' + crypto.randomBytes(12).toString('hex');
+      const icon = cleanProfile(m).icon;
+      const ok = await db.createAccount({ pid, username: key, name: u, icon, pin_hash: hashPin(String(m.pin)), fcode: fcode(pid) });
+      if (!ok) return send({ t: 'authErr', text: `"${u}" pehle se kisi ka hai. Doosra username chuno.` });
+      return send({ t: 'account', pid, name: u, icon });
     }
+    // login
+    const lock = fails.get(key);
+    if (lock && lock.n >= 5 && Date.now() - lock.at < 10 * 60_000) return send({ t: 'authErr', text: 'Bahut galat PIN. 10 minute baad try karo.' });
+    const p = await db.findByUsername(key);
+    if (!p || !p.pin_hash || !checkPin(String(m.pin), p.pin_hash)) {
+      fails.set(key, { n: (lock && Date.now() - lock.at < 10 * 60_000 ? lock.n : 0) + 1, at: Date.now() });
+      return send({ t: 'authErr', text: p ? 'PIN galat hai' : `"${u}" naam ka koi player nahi mila` });
+    }
+    fails.delete(key);
+    send({ t: 'account', pid: p.pid, name: p.name, icon: p.icon || '🙂' });
+  }
+
+  function handle(m) {
+    if (m.t === 'hello') { client.authing = true; return hello(m).catch(e => { console.error('hello', e.message); err('Server error'); }).finally(flush); }
+    if (m.t === 'register' || m.t === 'login' || m.t === 'checkName') return account(m).catch(e => { console.error('account', e.message); send({ t: 'authErr', text: 'Server error, dobara try karo' }); });
     if (!client.pid) return err('Pehle profile banao');
     const room = client.room, tour = client.tour;
     switch (m.t) {
@@ -196,9 +242,9 @@ wss.on('connection', ws => {
       case 'react': case 'say':
         if (room) room.social(client.pid, m);
         return;
-      case 'profile':
-        Object.assign(client, cleanProfile(m));
-        db.upsertPlayer(client.pid, client.name, client.icon, fcode(client.pid));
+      case 'profile':                                   // only the avatar can change; the name is the username
+        client.icon = cleanProfile(m).icon;
+        db.setIcon(client.pid, client.icon);
         if (room) { const i = room.seatOf(client.pid); if (i >= 0) { Object.assign(room.seats[i], { name: client.name, icon: client.icon }); room.sendAvatars(); room.broadcast(); } }
         if (tour) { const p = tour.byPid(client.pid); if (p) { p.name = client.name; p.icon = client.icon; tour.broadcast(); } }
         return;
@@ -262,7 +308,7 @@ wss.on('connection', ws => {
         return;
       }
     }
-  });
+  }
 
   ws.on('close', () => {
     clients.delete(client);
