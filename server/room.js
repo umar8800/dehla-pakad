@@ -9,6 +9,9 @@ const NEXT_GAME_MS = +process.env.NEXT_GAME_MS || 25_000; // next game starts ev
 const MATCH_READY_MS = +process.env.MATCH_READY_MS || 120_000; // missing players get a bot after this
 const BOT_NAMES = ['Zara', 'Imran', 'Bilal', 'Ayesha', 'Hamza', 'Sana', 'Faisal', 'Noor', 'Danish', 'Hira', 'Kabir', 'Mehak'];
 const BOT_ICONS = ['🐯', '🦁', '🐼', '🦊', '🐵', '🦉', '🐸', '🐨', '🐺', '🐻'];
+const TEAM_PRESETS = ['Manik Bagh Mandali', 'Badwali Chowki Badshahs', 'Khajrana Kings', 'Rajwada Royals', 'Thanos Ki Sena', 'Wakanda Warriors',
+  'Super Saiyan Squad', 'Titan Slayers', 'Meme Mafia', 'Hogwarts Ke Sher', 'Dehla Dacoits', 'Kot Killers', 'Turup Ke Badshah', 'Begum Ke Bodyguards',
+  'Desi Dons', 'Toofani Tigers', 'Desi Daredevils', 'Baazigar Boys', 'Chai Champions', 'Ludo Legends', 'Nukkad Ninjas'];
 const pick = a => a[Math.floor(Math.random() * a.length)];
 
 class Room {
@@ -17,7 +20,8 @@ class Room {
     this.onEmpty = onEmpty;
     this.seats = [null, null, null, null];
     this.hostPid = null;
-    this.teamNames = ['', ''];
+    const n1 = pick(TEAM_PRESETS);
+    this.teamNames = [n1, pick(TEAM_PRESETS.filter(n => n !== n1))];   // random names, host can change
     this.settings = { lengthType: 'games', games: 7, minutes: 30, showDehle: false, voice: true };
     this.watchers = new Map();   // pid -> { ws, name, icon }  people watching, not playing
     this.phase = 'lobby';
@@ -38,7 +42,7 @@ class Room {
 
   // ---------- tournament match ----------
   setupMatch(m) {
-    this.match = { tourCode: m.tourCode, matchId: m.matchId, stage: m.stage, round: m.round, games: m.games, knockout: m.knockout };
+    this.match = { tourCode: m.tourCode, matchId: m.matchId, stage: m.stage, round: m.round, games: m.games, knockout: m.knockout, practice: !!m.practice };
     this.teamNames = m.teamNames.slice();
     this.seats = m.seats.map(s => s.bot ? { bot: true, name: s.name, icon: s.icon, connected: true, forPid: null }
       : { pid: s.pid, name: s.name, icon: s.icon, ws: null, connected: false, bot: false, timeouts: 0 });
@@ -77,7 +81,8 @@ class Room {
       return null;
     }
     if (!this.locked) {
-      i = this.seats.findIndex(s => !s);
+      const empty = [0, 1, 2, 3].filter(k => !this.seats[k]);
+      i = empty.length === 4 ? 0 : empty.length ? pick(empty) : -1;
       if (i < 0 && this.phase !== 'lobby') {
         // A bot keeping a seat warm: the original player gets it back first, anyone else otherwise.
         i = this.seats.findIndex(s => s && s.bot && s.forPid === client.pid);
@@ -315,6 +320,7 @@ class Room {
 
   recordStats(r, kotTo, over) {
     const humans = this.seats.map((s, i) => s && !s.bot ? { pid: s.pid, i } : null).filter(Boolean);
+    if (humans.length < 2 || (this.match && this.match.practice)) return;   // practice with bots: no ranking
     const rows = humans.map(({ pid, i }) => {
       const t = team(i), row = { pid, games: 1, dehle: t === 0 ? r.a : r.b, friends: humans.filter(h => h.pid !== pid).map(h => h.pid) };
       if (kotTo !== null) { if (kotTo === t) row.kot_taken = 1; else row.kot_given = 1; }
@@ -425,4 +431,4 @@ class Room {
 }
 
 Room.voiceReady = false;
-module.exports = { Room, TURN_MS };
+module.exports = { TEAM_PRESETS, Room, TURN_MS };

@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Dehla Pakad</title>
 <meta name="description" content="Dehla Pakad: Mindi Coat with friends.">
+<meta property="og:title" content="Dehla Pakad · Friends ke saath Mindi Coat">
+<meta property="og:description" content="Online table, voice chat aur tournaments. Tap karo aur seedha join karo.">
+<meta property="og:image" content="%ORIGIN%/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#1a1225">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon-192.png">
@@ -104,6 +109,7 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .counter div{flex:1;text-align:center;background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:12px;padding:10px}
 .counter b{display:block;font-family:var(--f-display);font-size:26px;font-variant-numeric:tabular-nums}
 .counter span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+.codebox.invite{flex-wrap:wrap;gap:10px}.invbtns{display:flex;gap:8px;flex-wrap:wrap}.pill.wa{background:#25D366;color:#06301a;border-color:#25D366;font-weight:800}
 .lteams{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.lteams>*{min-width:0}
 .lteam{border:1px solid var(--line);border-radius:14px;padding:10px;background:rgba(0,0,0,.2)}
 .lteam.mine{border-color:var(--us)}
@@ -423,6 +429,11 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .av{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;position:relative;font-size:24px;border:none;padding:0}
 .seat.us .av{background:rgba(98,211,177,.25);box-shadow:inset 0 0 0 2px var(--us)}
 .seat.them .av{background:rgba(255,126,140,.22);box-shadow:inset 0 0 0 2px var(--them)}
+.seat.on .av{box-shadow:inset 0 0 0 3px var(--brass),0 0 0 6px rgba(242,179,63,.25),0 0 22px rgba(242,179,63,.55)!important}
+.seat.on .nm{color:var(--brass)}
+.tag.baari{display:inline-block;background:var(--brass);color:#2a1a05;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:9px;margin-bottom:2px;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.08)}}
+.sb-c b .up{color:var(--brass)}
 .seat.on .av::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:3px solid var(--brass);animation:spin 1.2s linear infinite;border-right-color:transparent}
 .seat.talk .av{box-shadow:inset 0 0 0 2px var(--talk),0 0 0 4px rgba(126,224,122,.35)}
 .av .cnt{position:absolute;right:-8px;bottom:-4px;background:var(--rail);color:var(--ink);border:1px solid var(--line);border-radius:9px;font-size:11px;font-weight:700;padding:1px 6px;font-variant-numeric:tabular-nums;font-family:var(--f-body)}
@@ -716,10 +727,11 @@ const rand=(a,b)=>a+Math.random()*(b-a);
 const DONKEY='<svg class="dk" viewBox="0 0 40 44" aria-hidden="true"><path d="M10 2c3 0 5 6 6 12h8c1-6 3-12 6-12s3 8 1 15c2 2 3 5 3 8 0 2-.4 3.6-1.2 5 1 1.2 1.6 2.6 1.6 4.2C33.4 39 27.7 42 20 42S6.6 39 6.6 34.2c0-1.6.6-3 1.6-4.2C7.4 28.6 7 27 7 25c0-3 1-6 3-8-2-7-2-15 0-15z" fill="#fff4f4" stroke="#4a0009" stroke-width="1.6"/><path d="M10.6 5.5c1 2.2 1.9 6 2.3 9.5M29.4 5.5c-1 2.2-1.9 6-2.3 9.5" stroke="#e79aa3" stroke-width="2.4" stroke-linecap="round" fill="none"/><ellipse cx="20" cy="34.2" rx="10" ry="6.4" fill="#f3c4c9" stroke="#4a0009" stroke-width="1.3"/><ellipse cx="16" cy="32.8" rx="1.5" ry="1.9" fill="#4a0009"/><ellipse cx="24" cy="32.8" rx="1.5" ry="1.9" fill="#4a0009"/><path d="M14.5 37.6q5.5 2.2 11 0" stroke="#4a0009" stroke-width="1.2" fill="none"/><rect x="17.3" y="38.3" width="2.6" height="3.6" rx=".6" fill="#fff" stroke="#4a0009" stroke-width=".9"/><rect x="20.1" y="38.3" width="2.6" height="3.6" rx=".6" fill="#fff" stroke="#4a0009" stroke-width=".9"/><circle cx="14" cy="24" r="2.8" fill="#fff" stroke="#4a0009" stroke-width="1"/><circle cx="26" cy="24" r="2.8" fill="#fff" stroke="#4a0009" stroke-width="1"/><circle cx="14.9" cy="25" r="1.2" fill="#4a0009"/><circle cx="25.2" cy="23.6" r="1.2" fill="#4a0009"/><path d="M11.1 22.9h5.8M23.1 22.9h5.8" stroke="#4a0009" stroke-width="1.8"/></svg>';
 const kotBadge=(n,size,opp=0)=>{const z=size===false?'md':(size===true||size===undefined)?'sm':size;
   if(n) return `<span class="shame ${z}" title="${n} Kot"><span class="dk">${DONKEY}</span><span class="tx"><b>KOT</b><em>${n}</em></span></span>`;
-  if(opp) return `<span class="baad ${z}" title="Kot diya"><span class="cr">👑</span><span class="tx"><b>Baadshah</b><em>Kot diya</em></span></span>`;
+  if(opp) return `<span class="baad ${z}" title="Kot diya"><span class="cr">👑</span><span class="tx"><b>King</b><em>Kot diya</em></span></span>`;
   return `<span class="kz ${z}" title="Koi Kot nahi"><b>KOT</b><em>0</em></span>`;};
 const CREST=[['#f6c453','#8a5a00'],['#62d3b1','#0f5c49'],['#ff7e8c','#7a1424'],['#8fb3ff','#1d3f8a'],['#c59bff','#4b2382'],['#ffa45c','#7a3b06'],['#7ee07a','#1f5c1c'],['#f58ad8','#6e1a58']];
 const initials=n=>{const w=String(n||'?').trim().split(/\s+/);return (w.length>1?w[0][0]+w[1][0]:w[0].slice(0,2)).toUpperCase();};
+const kotScore=(a,b)=>`<span class="${a>b?'up':''}">${a}</span>–<span class="${b>a?'up':''}">${b}</span>`;
 const crest=(name,ci,size='md')=>{const c=CREST[((ci%CREST.length)+CREST.length)%CREST.length];return `<span class="crest ${size}" style="--ca:${c[0]};--cb:${c[1]}" aria-hidden="true">${esc(initials(name))}</span>`;};
 const gadhas=n=>kotBadge(n,'sm');
 
@@ -790,9 +802,12 @@ function renderMe(){
   <div class="panel mehead"><div class="bigav">${av(D.icon)}</div><div class="stack-v" style="gap:6px;flex:1;min-width:0"><p class="lab" style="margin:0">Tumhara naam</p><input class="input" id="meName" maxlength="14" value="${esc(D.name)}" placeholder="Jaise: Umar" autocomplete="off"></div></div>
   <div class="panel"><p class="lab">Avatar chuno</p><div class="chiprow">${sets.map(x=>`<button class="pill ${ME.set===x?'on':''}" data-set="${x}" type="button">${x}</button>`).join('')}</div>${picker}</div>
   <button class="cta" id="meSave" type="button">${ME.onboard?'Shuru karo':'Save karo'}</button>
-  ${ME.onboard?'<p class="muted" style="font-size:12px;margin:0;text-align:center">Bas naam aur avatar. Koi email, phone ya password nahi.</p>':`
+  ${ME.onboard?'<p class="muted" style="font-size:12px;margin:0;text-align:center">Bas naam aur avatar. Koi email, phone ya password nahi.</p><button class="cta ghost" id="meRestore" type="button">Pehle khel chuke ho? Account code daalo</button>':`
   <div class="panel"><p class="lab">Tumhare stats</p><div class="statgrid"><div><b>🏆 ${st.tw}</b><span>Tournament wins</span></div><div><b>${st.finals}</b><span>Finals</span></div><div><b>${st.tablesW}/${st.tablesP}</b><span>Tables won</span></div><div><b>${st.kotGiven}</b><span>Kot diye</span></div><div class="bad"><b>${st.kotTaken}</b><span>Kot khaye</span></div><div><b>${st.tours}</b><span>Tournaments</span></div></div></div>
   <div class="panel menu" style="margin:0"><div class="row"><div><b>Mic permission</b><small id="meMicTxt">Voice chat ke liye</small></div><button class="pill" id="meMic" type="button">Check karo</button></div></div>
+  <div class="panel"><p class="lab">Tumhara account code</p><p class="muted" style="font-size:12.5px;margin:0 0 8px">Naya phone ya browser? Wahan ye code daalo, tumhari ranking aur stats wapas aa jayengi. Ye code kisi ko mat do.</p>
+    <div class="row"><code style="user-select:all;font-size:14px;word-break:break-all">${esc(NET.pid)}</code><button class="pill" id="meCopyPid" type="button">Copy</button></div>
+    <button class="cta ghost" id="meRestore" type="button" style="margin-top:10px">Doosra account code daalo</button></div>
   <div class="panel menu" style="margin:0"><div class="row"><div><b>Bots ki speed</b><small>Offline aur test games mein</small></div><button class="pill" id="meSpeed" type="button">${APP.speed}</button></div></div>`}`;
   const bm=$('meBody');
   $('meName').addEventListener('input',e=>{D.name=e.target.value;});
@@ -805,6 +820,15 @@ function renderMe(){
   const mm=$('meMic');if(mm){const show=()=>{const t={granted:'✅ Allowed',denied:'⛔ Blocked',prompt:'Abhi poocha nahi',unknown:'Pata nahi',error:'Mic nahi mila'}[MIC.state]||'';$('meMicTxt').textContent=`Voice chat ke liye · ${t}`;mm.textContent=MIC.state==='granted'?'Theek hai':MIC.state==='denied'?'Theek karo':'Allow karo';};
     micStatus().then(show);mm.addEventListener('click',async()=>{if(MIC.state==='granted'){toast('Mic allowed hai 🎙');return;}await ensureMic();show();});}
   const sp=$('meSpeed');if(sp)sp.addEventListener('click',()=>{const k=Object.keys(SPEEDS);APP.speed=k[(k.indexOf(APP.speed)+1)%k.length];try{localStorage.setItem('dp-speed',APP.speed);}catch(e){}sp.textContent=APP.speed;});
+  const cp=$('meCopyPid');if(cp)cp.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(NET.pid);toast('Code copy ho gaya');}catch(e){toast('Code select karke copy karo');}});
+  $('meRestore').addEventListener('click',()=>openSheet(`<h2>Account code</h2><p>Purane phone pe Profile mein jo code hai, woh yahan daalo.</p><input class="input" id="rcode" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="p…"><button class="cta" data-act="go" type="button" style="margin-top:12px">Account wapas lao</button><button class="cta ghost" data-act="close" type="button">Rehne do</button>`,{go:()=>{
+    const v=($('rcode').value||'').trim();
+    if(!/^p[a-z0-9]{8,40}$/.test(v)){toast('Ye code sahi nahi lag raha','them');return;}
+    try{localStorage.setItem('dp-pid',v);}catch(e){}
+    closeSheet();
+    if(ME.onboard){NET.pid=v;toast('Account mil gaya. Naam likh ke Shuru karo.');}
+    else{toast('Account badal raha hai…');setTimeout(()=>location.reload(),600);}
+  }}));
   $('meSave').addEventListener('click',()=>{
     const n=D.name.trim();
     if(!n){toast('Pehle apna naam likho','them');$('meName').focus();return;}
@@ -949,6 +973,7 @@ function nextTableGame(first){
   startGame({
     names:T.seats.map(p=>p.you?'Tum':p.name), icons:T.seats.map(p=>p.icon), dealer:T.dealer, logs:T.logs, teamNames:[tName(0),tName(1)], crestIdx:[1,2],
     center:()=>{const tl=T.lengthType==='games'?{big:`${Math.min(T.played+1,T.games)}/${T.games}`,small:'Game'}:(()=>{const left=Math.max(0,T.minutes*60000-(Date.now()-T.start));return{big:`${Math.floor(left/60000)}:${String(Math.floor(left%60000/1000)).padStart(2,'0')}`,small:`Baaki<br>Game ${T.played+1}`};})();
+      {const K=T.kot,g0=K.holder===1?K.n:0,g1=K.holder===0?K.n:0;tl.small=`Kot score<br>${T.lengthType==='games'?'Game '+tl.big:tl.small.replace('Baaki<br>',tl.big+' baaki · ')}`;tl.big=kotScore(g0,g1);}
       if(T.showDehle) tl.small+=`<br>${T.dehle[0]}:${T.dehle[1]} pts`;return tl;},
     human:T.mode!=='offline', timer:T.mode!=='offline', voice:T.mode==='friends'&&T.voice,
     title:()=>tableTitle(),
@@ -993,7 +1018,7 @@ function tableFinal(){
   const draw=K.holder===null, won=!draw&&K.holder===1, n0=esc(tName(0)), n1=esc(tName(1));
   bump('tablesP'); if(won) bump('tablesW');
   openSheet(`<div class="result ${draw?'':won?'good':'bad'}">${draw?'Draw':won?'Table Win!':'Table Lose'}</div>
-    <p>${draw?'Table khatam aur Kot kisi ke paas nahi. Dono Baadshah, isliye draw.':won?`${n1} ${K.n} Kot ke saath table se gaye. ${n0} Baadshah!`:`${n0} ${K.n} Kot ke saath table se gaye. ${n1} Baadshah.`}</p>
+    <p>${draw?'Table khatam aur Kot kisi ke paas nahi. Isliye draw, 0–0.':won?`${n1} ${K.n} Kot ke saath table se gaye. ${n0} King 👑!`:`${n0} ${K.n} Kot ke saath table se gaye. ${n1} Baadshah.`}</p>
     <div class="prio"><div class="prow r1"><div class="pl"><span class="pr">1</span><div><b>Kot</b><small>${T.played} games khele</small></div></div><div class="pv ${K.holder===1?'lead':''}"><span>${n0}</span><b>${kotBadge(K.holder===0?K.n:0,'md',K.holder===1?K.n:0)}</b></div><div class="pv ${K.holder===0?'lead':''}"><span>${n1}</span><b>${kotBadge(K.holder===1?K.n:0,'md',K.holder===0?K.n:0)}</b></div></div>
     <div class="prow r3"><div class="pl"><span class="pr">2</span><div><b>Dehle points</b><small>Stats mein jayenge, result pe asar nahi</small></div></div><div class="pv"><span>${n0}</span><b>${T.dehle[0]}</b></div><div class="pv"><span>${n1}</span><b>${T.dehle[1]}</b></div></div></div>
     ${histStrip(T)}
@@ -1201,9 +1226,9 @@ function render(){
   for(const p of [1,2,3]){
     const el=$('seat'+p),n=G.hands[p].length;
     el.classList.toggle('on',G.phase==='play'&&!G.resolving&&G.turn===p);
-    const tags=(G.trumpSetter===p?'<span class="tag">Turup decide kiya</span>':'')+(G.streak.p===p?'<span class="tag need">Ek aur</span>':'');
+    const tags=(G.phase==='play'&&!G.resolving&&G.turn===p?'<span class="tag baari">⏳ Iski baari</span>':'')+(G.trumpSetter===p?'<span class="tag">Turup decide kiya</span>':'')+(G.streak.p===p?'<span class="tag need">Ek aur</span>':'');
     const bub=el.querySelector('.bubble');
-    el.innerHTML=`<button class="av" type="button" data-seat="${p}" aria-label="${G.names[p]} ko reaction bhejo">${av(G.icons[p])}<span class="cnt">${n}</span></button><div class="nm">${G.names[p]}</div><div class="role">${G.cfg.watching?esc(G.cfg.teamNames[p%2]):p===2?'Partner':'Opponent'}</div><div>${tags}</div>`;
+    el.innerHTML=`<button class="av" type="button" data-seat="${p}" aria-label="${G.names[p]} ko reaction bhejo">${av(G.icons[p])}</button><div class="nm">${G.names[p]}</div><div class="role">${G.cfg.watching?esc(G.cfg.teamNames[p%2]):p===2?'Partner':'Opponent'}</div><div>${tags}</div>`;
     if(bub) el.appendChild(bub);
   }
   const c=$('center');c.className='center';
@@ -1303,7 +1328,7 @@ function rulesHTML(){
   return `<div class="sheethead"><h2>Rules</h2><button class="pill" data-act="close" type="button">Close</button></div>
   <h3>Turup decide hona</h3><ol><li>Sabko 5 patte, haath turant shuru. Jo color chala, wahi chalna zaroori.</li><li>Jiske paas chaal ka color nahi, us pehle khiladi ka patta turup decide karta hai.</li><li>Usi haath mein bada turup daale toh woh win karega.</li><li>Turup decide hone ke baad baaki patte baante jaate hain. Turup wala haath jisne win kiya, woh pehle chalta hai.</li></ol>
   <h3>Dehla pakadna</h3><ol><li>Patte dher mein ulte jama hote hain.</li><li>Dher mein dehla ho toh ek hi khiladi ko lagatar do haath win karne padte hain.</li><li>Koi aur win kare toh rok deta hai, apna partner bhi.</li><li>Aakhri haath win karne wale ko bacha dher milta hai.</li></ol>
-  <h3>Table</h3><ul><li>Sirf Kot count hota hai, aur Kot cancel hote hain. Ek waqt pe sirf ek team ke paas Kot.</li><li>Kot wali team pe laal KOT ka shame stamp, doosri team Baadshah. End pe jiske paas Kot, uski Lose. Kisi ke paas nahi toh draw.</li></ul>
+  <h3>Table</h3><ul><li>Sirf Kot count hota hai, aur Kot cancel hote hain. Ek waqt pe sirf ek team ke paas Kot.</li><li>Kot wali team pe laal KOT ka shame stamp, doosri team King 👑. End pe jiske paas Kot, uski Lose. Kisi ke paas nahi toh draw.</li></ul>
   <h3>Tournament</h3><ul><li>1 point har dehla, Kot pe 6 points. Kot cancel nahi hote.</li><li>Ranking: points, kam Kot, dehle, haath, aapas ka result.</li></ul>`;
 }
 
@@ -1358,13 +1383,33 @@ function renderTourSetup(){
     <div class="seg">${['₹500 Amazon voucher','₹1000 Amazon voucher','Koi prize nahi'].map(x=>`<button class="pill ${S.prize===x||(x==='Koi prize nahi'&&!S.prize)?'on':''}" data-prize="${x}" type="button">${x}</button>`).join('')}</div>
     <p class="muted" style="font-size:12px;margin:0">Entry free hai. Jeetne wali team apna email bhejegi; tumhe app mein dikhega aur voucher tum khud bhejoge.</p></div>
   <div class="panel"><p class="lab">Points</p><p style="margin:0;line-height:1.5">1 point har dehla · Kot pe 6 points · Haath sirf semi-final aur final mein tie todte hain. 4+ teams: top 4 semi-final mein. 3 teams: top 2 seedha final.</p></div>
-  <button class="cta" id="tsGo" type="button">Lobby kholo</button>`;
+  <button class="cta" id="tsGo" type="button">Lobby kholo</button>
+  <button class="cta ghost" id="tsBots" type="button">🤖 Sirf bots ke saath practice</button>
+  <p class="muted" style="font-size:12px;margin:-4px 0 0;text-align:center">Practice mein tum + bot partner vs 2 bot teams. Ranking pe asar nahi.</p>`;
   $('tsBody').querySelectorAll('[data-k]').forEach(b=>b.addEventListener('click',()=>{S[b.dataset.k]=+b.dataset.v;renderTourSetup();}));
   $('tsPrize').addEventListener('input',e=>{S.prize=e.target.value.trim();});
   $('tsBody').querySelectorAll('[data-prize]').forEach(b=>b.addEventListener('click',()=>{S.prize=b.dataset.prize==='Koi prize nahi'?'':b.dataset.prize;renderTourSetup();}));
+  $('tsBots').addEventListener('click',()=>{TOUR.follow=true;netSend({t:'tourCreate',settings:{...S,prize:''},practice:true});toast('Practice tournament ban raha hai…');});
   $('tsGo').addEventListener('click',()=>{TOUR.follow=true;netSend({t:'tourCreate',settings:S});toast('Tournament ban raha hai…');});
 }
 
+const inviteURL=code=>`${location.origin}/${code}`;
+function inviteMsg(kind,code,prize){
+  return kind==='tour'
+    ?`🏆 *Dehla Pakad Tournament*\n${prize?`🎁 Prize: ${prize}\n`:''}Free entry · Partner chuno, team banao, Kot se bacho 😄\n\nTap karke join karo 👇\n${inviteURL(code)}\n\nCode: *DP-${code}*`
+    :`🃏 *Dehla Pakad* khelne aao!\nMeri table pe aao, voice chat ke saath khelenge 🎙\n\nTap karke join karo 👇\n${inviteURL(code)}\n\nCode: *DP-${code}*`;
+}
+function inviteBox(label,code){
+  return `<div class="codebox invite"><div><p class="lab" style="margin:0 0 2px">${label}</p><b>DP-${code}</b><small class="muted" style="display:block;font-size:11.5px;margin-top:2px">${esc(inviteURL(code).replace(/^https?:\/\//,''))}</small></div>
+    <div class="invbtns"><button class="pill wa" type="button" data-inv="wa">WhatsApp</button><button class="pill" type="button" data-inv="more">Share / Copy</button></div></div>`;
+}
+function bindInvite(root,msg){
+  const wa=root.querySelector('[data-inv=wa]'),more=root.querySelector('[data-inv=more]');
+  if(wa)wa.addEventListener('click',()=>{window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');});
+  if(more)more.addEventListener('click',async()=>{
+    try{if(navigator.share){await navigator.share({text:msg});return;}}catch(e){if(e&&e.name==='AbortError')return;}
+    try{await navigator.clipboard.writeText(msg.replace(/\*/g,''));toast('Invite copy ho gaya. Kahin bhi paste karo.');}catch(e){toast('Code bata do: '+msg.match(/DP-\d+/)[0]);}});
+}
 function tourPlayer(id){return TOUR.state.players.find(p=>p.id===id);}
 function renderTLobby(){
   const T=TOUR.state,me=T.players.find(p=>p.you),host=T.isHost,humans=T.players.filter(p=>!p.bot);
@@ -1375,7 +1420,7 @@ function renderTLobby(){
     return `<button type="button" class="pchip ${TOUR.sel===p.id?'sel':''}" data-tp="${p.id}"><span class="ic">${av(p.icon)}</span><div><b>${esc(p.name)}</b><small>${s.join(' · ')||'&nbsp;'}</small></div>${host&&!TOUR.arrange&&p.team===null&&!p.bot?`<span class="rmb" data-botp="${p.id}" aria-label="Bot partner">🤖</span>`:''}</button>`;};
   const canName=t=>host||(me&&t.ids.includes(me.id));
   let html=`${T.settings.prize?`<div class="codebox"><div><p class="lab" style="margin:0 0 2px">Prize</p><b style="font-size:17px;letter-spacing:0">🎁 ${esc(T.settings.prize)}</b></div><span class="muted" style="font-size:11px;text-align:right">Free entry<br>Winning team ko</span></div>`:''}
-  <div class="codebox"><div><p class="lab" style="margin:0 0 2px">Tournament code</p><b>DP-${T.code}</b></div><button class="pill" type="button" id="tlShare">Invite bhejo</button></div>
+  ${inviteBox('Tournament code',T.code)}
   <div class="counter"><div><b>${humans.length}</b><span>Players</span></div><div><b>${T.teams.length}</b><span>Teams</span></div><div><b>${solo.length}</b><span>Partner dhoond rahe</span></div></div>
   <div class="panel"><div class="row" style="margin-bottom:10px"><p class="lab" style="margin:0">Teams</p>${host?`<div class="seg"><button class="pill ${TOUR.arrange?'on':''}" id="tlArr" type="button">${TOUR.arrange?'Arrange: on':'Arrange'}</button><button class="pill" id="tlRand" type="button">Randomise</button></div>`:''}</div>
     ${T.teams.length?`<div class="lteams">${T.teams.map(t=>`<div class="lteam ${me&&t.ids.includes(me.id)?'mine':''}"><button class="tedit" type="button" data-tn="${t.idx}" ${canName(t)?'':'disabled'}>${crest(t.name,t.idx,'sm')}<h3>${esc(t.name)}</h3>${canName(t)?'<span>✎</span>':''}</button>${t.ids.map(id=>chip(tourPlayer(id))).join('')}${host&&t.ids.every(id=>{const q=tourPlayer(id);return q&&q.bot;})?`<button class="pill sm" type="button" data-rmt="${t.idx}" style="width:100%">Hatao</button>`:''}</div>`).join('')}</div>`:'<p class="muted" style="margin:0 0 8px;font-size:13px">Abhi koi team nahi bani.</p>'}
@@ -1388,9 +1433,7 @@ function renderTLobby(){
   <button class="cta ghost" id="tlLeave" type="button">Tournament chhodo</button>`;
   $('lbBody').innerHTML=html;
   const q=$;
-  q('tlShare').addEventListener('click',async()=>{const text=`Dehla Pakad tournament! Code DP-${T.code}${T.settings.prize?' · Prize: '+T.settings.prize:''}`;
-    try{if(navigator.share){await navigator.share({title:'Dehla Pakad',text,url});return;}}catch(e){if(e&&e.name==='AbortError')return;}
-    try{await navigator.clipboard.writeText(`${text}\n${url}`);toast('Invite copy ho gaya. WhatsApp pe paste karo.');}catch(e){toast(`Code: DP-${T.code}`);}});
+  bindInvite($('lbBody'),inviteMsg('tour',T.code,T.settings.prize));
   if(q('tlArr'))q('tlArr').addEventListener('click',()=>{TOUR.arrange=!TOUR.arrange;TOUR.sel=null;renderTLobby();});
   if(q('tlRand'))q('tlRand').addEventListener('click',()=>netSend({t:'tour',a:'randomize'}));
   if(q('tlBreak'))q('tlBreak').addEventListener('click',()=>netSend({t:'tour',a:'leaveTeam'}));
@@ -1707,8 +1750,9 @@ function onlineGame(st){
     title:()=>isMatch?`${stageName(st.match.stage)} · ${nTeam(mt)} v ${nTeam(1-mt)}`:`Friends ki table · DP-${st.code}`,
     sub:()=>isMatch?`Game ${Math.min(T.played+1,MM.games)}/${MM.games} · Points ${MM.pts[mt]}:${MM.pts[1-mt]}${st.watchers.length?` · 👀 ${st.watchers.length}`:''}`:`${S.lengthType==='games'?`Game ${Math.min(T.played+1,S.games)}/${S.games}`:'Time wali table'} · Kot: ${holder===null?'kisi ke paas nahi':esc(cfg.teamNames[holder])+' '+T.kot.n}${st.watchers.length?` · 👀 ${st.watchers.length}`:''}`,
     kotFor:t=>isMatch?MM.kots[t===0?mt:1-mt]:holder===t?T.kot.n:0,
-    center:()=>{if(isMatch)return{big:`${MM.pts[mt]}:${MM.pts[1-mt]}`,small:`Points<br>Game ${Math.min(T.played+1,MM.games)}/${MM.games}`};let tl;if(S.lengthType==='games')tl={big:`${Math.min(T.played+1,S.games)}/${S.games}`,small:'Game'};
+    center:()=>{if(isMatch)return{big:`${MM.pts[mt]}:${MM.pts[1-mt]}`,small:`Points · Kot ${MM.kots[1-mt]}–${MM.kots[mt]}<br>Game ${Math.min(T.played+1,MM.games)}/${MM.games}`};let tl;if(S.lengthType==='games')tl={big:`${Math.min(T.played+1,S.games)}/${S.games}`,small:'Game'};
       else{const left=Math.max(0,S.minutes*60000-T.elapsed-(Date.now()-NET.stateAt));tl={big:`${Math.floor(left/60000)}:${String(Math.floor(left%60000/1000)).padStart(2,'0')}`,small:`Baaki<br>Game ${T.played+1}`};}
+      {const g0=holder===1?T.kot.n:0,g1=holder===0?T.kot.n:0;tl.small=`Kot score<br>${S.lengthType==='games'?'Game '+tl.big:tl.small.replace('Baaki<br>',tl.big+' baaki · ')}`;tl.big=kotScore(g0,g1);}
       if(S.showDehle)tl.small+=`<br>${T.dehle[mt]}:${T.dehle[1-mt]} pts`;return tl;},
     onLeave:()=>openSheet(isMatch?(watching?`<h2>Dekhna band karein?</h2><p>Dashboard pe wapas jaoge.</p>`:`<h2>Match chhodna hai?</h2><p>Tumhari jagah bot khelega. Dashboard se "Wapas jao" dabake seat wapas le sakte ho.</p>`):`<h2>Table chhodna hai?</h2><p>Tumhari jagah bot khelega. Wapas aao toh seat mil sakti hai.</p><button class="cta" data-act="leave" type="button">Haan, chhodo</button><button class="cta ghost" data-act="close" type="button">Nahi, khelte raho</button>`,{leave:()=>{closeSheet();NET.follow=false;netSend({t:'leave'});}})};
   NET.stateAt=Date.now();
@@ -1788,7 +1832,7 @@ function showOnlineResult(st){
     const draw=holder===null,won=holder===1,isHost=st.host===me;
     if(!watching){bump('tablesP');if(won)bump('tablesW');}
     openSheet(`<div class="result ${draw?'':won?'good':'bad'}">${draw?'Draw':won?'Table Win!':'Table Lose'}</div>
-      <p>${draw?'Table khatam aur Kot kisi ke paas nahi. Isliye draw.':won?`${n1} ${K.n} Kot ke saath table se gaye. ${n0} Baadshah!`:`${n0} ${K.n} Kot ke saath table se gaye. ${n1} Baadshah.`}</p>
+      <p>${draw?'Table khatam aur Kot kisi ke paas nahi. Isliye draw, 0–0.':won?`${n1} ${K.n} Kot ke saath table se gaye. ${n0} King 👑!`:`${n0} ${K.n} Kot ke saath table se gaye. ${n1} Baadshah.`}</p>
       <div class="prio">${kotRow}</div>${hist}
       ${isHost?'<button class="cta" data-act="again" type="button" style="margin-top:16px">Rematch, same players</button>':'<p class="testnote">Host rematch shuru kar sakta hai.</p>'}
       <button class="cta ghost" data-act="home" type="button">Table chhodo</button>`,
@@ -1807,7 +1851,7 @@ function renderOLobby(){
   const col=t=>`<div class="tcol ${t===base%2?'us':'them'}"><button class="tedit" type="button" data-tn="${t}" ${isHost||mine(t)?'':'disabled'}>${crest(nTeam(t),t===base%2?1:2,'sm')}<h3>${esc(nTeam(t))}</h3>${isHost||mine(t)?'<span>Naam ✎</span>':''}</button>${chip(t)}${chip(t+2)}</div>`;
   const url=`${location.origin}/?join=${st.code}`;
   let html=watching?`<div class="watchnote"><span>👀 Tum dekh rahe ho.${st.seats.some(x=>!x)?' Ek seat khali hai.':''}</span>${st.seats.some(x=>!x)?'<button class="pill on" type="button" id="olSit">Seat lo</button>':''}</div>`:'';
-  html+=`<div class="codebox"><div><p class="lab" style="margin:0 0 2px">Table code</p><b>DP-${st.code}</b></div><button class="pill" type="button" id="olShare">Invite bhejo</button></div>`;
+  html+=inviteBox('Table code',st.code);
   html+=`<div class="panel"><div class="row" style="margin-bottom:10px"><p class="lab" style="margin:0">Teams</p>${isHost?'<button class="pill" type="button" id="olRand">Randomise</button>':''}</div>
     <div class="teamsetup">${col(base%2)}${col(1-base%2)}</div>
     <p class="muted" style="font-size:12px;margin:4px 0 0">${isHost?'Do players pe tap karo unki jagah badalne ke liye. Khali seat pe bot bitha sakte ho.':'Host teams aur settings set karega.'}</p></div>`;
@@ -1824,9 +1868,7 @@ function renderOLobby(){
   }
   $('olBody').innerHTML=html;
   const q=id=>$(id);
-  q('olShare').addEventListener('click',async()=>{const text=`Dehla Pakad khelne aao! Table code DP-${st.code}`;
-    try{if(navigator.share){await navigator.share({title:'Dehla Pakad',text,url});return;}}catch(e){if(e&&e.name==='AbortError')return;}
-    try{await navigator.clipboard.writeText(`${text}\n${url}`);toast('Invite copy ho gaya. WhatsApp pe paste karo.');}catch(e){toast(`Code: DP-${st.code}`);}});
+  bindInvite($('olBody'),inviteMsg('table',st.code));
   if(q('olRand'))q('olRand').addEventListener('click',()=>netSend({t:'host',a:'randomize'}));
   if(q('olBots'))q('olBots').addEventListener('click',()=>netSend({t:'host',a:'fillBots'}));
   if(q('olStart'))q('olStart').addEventListener('click',()=>netSend({t:'host',a:'start'}));
@@ -1976,7 +2018,7 @@ function voiceMuteToggle(absSeat){
 }
 
 /* ================= boot ================= */
-(()=>{const q=new URLSearchParams(location.search),j=(q.get('join')||'').replace(/\D/g,'');if(j){NET.pendingJoin=j;history.replaceState(null,'','/');}})();
+(()=>{const q=new URLSearchParams(location.search),pm=location.pathname.match(/^\/(?:dp-?)?(\d{4,6})\/?$/i),j=(q.get('join')||(pm?pm[1]:'')).replace(/\D/g,'');if(j){NET.pendingJoin=j;history.replaceState(null,'','/');}})();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 if(APP.profile){ goHome(); NET.follow=true; netConnect(); } else openMe(true);
 })();

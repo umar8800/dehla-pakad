@@ -32,6 +32,11 @@ const server = http.createServer((req, res) => {
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
   if (url.pathname === '/' || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(PUBLIC, 'index.html');
   const ext = path.extname(file);
+  if (file.endsWith('index.html')) {               // fill in the site address for WhatsApp link previews
+    const proto = req.headers['x-forwarded-proto'] || 'http';
+    res.writeHead(200, { 'content-type': TYPES['.html'], 'cache-control': 'no-cache' });
+    return res.end(INDEX().replace(/%ORIGIN%/g, `${proto}://${req.headers.host}`));
+  }
   res.writeHead(200, {
     'content-type': TYPES[ext] || 'application/octet-stream',
     'cache-control': ext === '.html' || file.endsWith('sw.js') ? 'no-cache' : 'public, max-age=3600',
@@ -39,6 +44,8 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
+let indexCache = null;
+const INDEX = () => (process.env.NODE_ENV === 'production' && indexCache) || (indexCache = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8'));
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 });
 
 function newCode() {
@@ -184,6 +191,11 @@ wss.on('connection', ws => {
         client.tour = t;
         t.join(client);
         if (m.settings) t.act(client.pid, { a: 'settings', settings: m.settings });
+        if (m.practice) {                                // you + bot partner vs two bot teams
+          const me = t.byPid(client.pid);
+          t.act(client.pid, { a: 'botPartner', id: me.id });
+          t.act(client.pid, { a: 'botTeam' }); t.act(client.pid, { a: 'botTeam' });
+        }
         return;
       }
       case 'tour':

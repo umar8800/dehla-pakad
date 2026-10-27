@@ -1,11 +1,8 @@
 // Tournaments: a lobby where friends form teams of 2, a league, then
 // semi-finals (or a straight final with 3 teams). Each match is a locked Room.
-const { Room } = require('./room');
+const { Room, TEAM_PRESETS } = require('./room');
 const db = require('./db');
 
-const TEAM_PRESETS = ['Manik Bagh Mandali', 'Badwali Chowki Badshahs', 'Khajrana Kings', 'Rajwada Royals', 'Thanos Ki Sena', 'Wakanda Warriors',
-  'Super Saiyan Squad', 'Titan Slayers', 'Meme Mafia', 'Hogwarts Ke Sher', 'Dehla Dacoits', 'Kot Killers', 'Turup Ke Badshah', 'Begum Ke Bodyguards',
-  'Desi Dons', 'Toofani Tigers', 'Desi Daredevils', 'Baazigar Boys', 'Chai Champions', 'Ludo Legends', 'Nukkad Ninjas'];
 const BOT_NAMES = ['Zara', 'Imran', 'Bilal', 'Ayesha', 'Hamza', 'Sana', 'Faisal', 'Noor', 'Danish', 'Hira', 'Kabir', 'Mehak'];
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const MIN_TEAMS = 3, MAX_TEAMS = 16;
@@ -51,6 +48,8 @@ class Tournament {
       if (this.players.filter(x => !x.bot).length >= MAX_TEAMS * 2) return 'Tournament bhar gaya hai';
       p = { id: this.nextId++, pid: client.pid, name: client.name, icon: client.icon, ws: client.ws, connected: true, team: null, want: null, bot: false };
       this.players.push(p);
+      const waiting = this.players.filter(x => !x.bot && x !== p && x.team === null && x.connected);
+      if (waiting.length) this.makeTeam(waiting[Math.floor(Math.random() * waiting.length)], p);
     } else {
       this.watchers.set(client.pid, client.ws);
     }
@@ -97,6 +96,12 @@ class Tournament {
     this.deps.onEmpty(this.code);
   }
 
+  practice() { return this.players.filter(p => !p.bot).length < 2; }
+  botPlayer() {
+    const used = this.players.map(x => x.name);
+    const b = { id: this.nextId++, pid: null, name: shuffle(BOT_NAMES).find(n => !used.includes(n)) || 'Bot', icon: '🤖', ws: null, connected: true, team: null, want: null, bot: true };
+    this.players.push(b); return b;
+  }
   // ---------- team building (lobby) ----------
   freeName() { const used = this.teams.map(t => t.name); return shuffle(TEAM_PRESETS).find(n => !used.includes(n)) || `Team ${this.teams.length + 1}`; }
 
@@ -151,8 +156,7 @@ class Tournament {
       [a.team, b.team] = [b.team, a.team];
     } else if (m.a === 'botTeam') {
       if (this.teams.length >= 12) return 'Bas, 12 teams kaafi hain';
-      const mk = () => { const used = this.players.map(x => x.name); const b = { id: this.nextId++, pid: null, name: shuffle(BOT_NAMES).find(n => !used.includes(n)) || 'Bot', icon: '🤖', ws: null, connected: true, team: null, want: null, bot: true }; this.players.push(b); return b; };
-      this.makeTeam(mk(), mk());
+      this.makeTeam(this.botPlayer(), this.botPlayer());
     } else if (m.a === 'removeTeam') {
       const t = this.teams[m.team];
       if (!t || !t.ids.every(id => { const q = this.byId(id); return q && q.bot; })) return;
@@ -160,10 +164,7 @@ class Tournament {
     } else if (m.a === 'botPartner') {
       const p = this.byId(m.id);
       if (!p || p.team !== null) return;
-      const used = this.players.map(x => x.name);
-      const bot = { id: this.nextId++, pid: null, name: shuffle(BOT_NAMES).find(n => !used.includes(n)) || 'Bot', icon: '🤖', ws: null, connected: true, team: null, want: null, bot: true };
-      this.players.push(bot);
-      this.makeTeam(p, bot);
+      this.makeTeam(p, this.botPlayer());
     } else if (m.a === 'settings') {
       const s = m.settings || {};
       if ([1, 2, 3, 6, 8].includes(s.gpm)) this.settings.gpm = s.gpm;
@@ -216,7 +217,7 @@ class Tournament {
     const seat = id => { const p = this.byId(id); return p.bot ? { bot: true, name: p.name, icon: p.icon } : { pid: p.pid, name: p.name, icon: p.icon }; };
     const code = this.deps.newCode();
     const room = new Room(code, c => this.deps.roomGone(c), {
-      tourCode: this.code, matchId: m.id, stage: m.stage, round: m.round, games: this.settings.gpm, knockout: m.stage !== 'league',
+      tourCode: this.code, matchId: m.id, stage: m.stage, round: m.round, games: this.settings.gpm, knockout: m.stage !== 'league', practice: this.practice(),
       teamNames: [A.name, B.name], seats: [seat(A.ids[0]), seat(B.ids[0]), seat(A.ids[1]), seat(B.ids[1])],
     });
     this.hook(room, m);
@@ -284,9 +285,9 @@ class Tournament {
         if (p.team === f.a || p.team === f.b) r.finals = 1;
         if (p.team === this.champion) r.tw = 1;
       });
-      db.bumpStats(rows);
       const C = this.teams[this.champion];
-      db.insertTournament({ code: this.code, host_pid: this.hostPid, prize: this.settings.prize, champion: { name: C.name, players: humansOf(this.champion).map(p => p.name) }, data: this.publicData() });
+      if (!this.practice()) db.bumpStats(rows);
+      if (!this.practice()) db.insertTournament({ code: this.code, host_pid: this.hostPid, prize: this.settings.prize, champion: { name: C.name, players: humansOf(this.champion).map(p => p.name) }, data: this.publicData() });
       this.checkEmpty();
     }
   }

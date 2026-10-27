@@ -58,6 +58,10 @@ function phone(n) {
   H.send({ t: 'tour', a: 'start' });
   for (let i = 0; i < 1500 && H.tour.phase !== 'done'; i++) await sleep(100);
   if (H.tour.phase !== 'done') fail('tournament stuck in ' + H.tour.phase + ' ' + JSON.stringify(H.tour.matches.map(m => m.status)));
+  // One-tap practice: you + bot partner vs two bot teams.
+  const S = phone('Practice'); await S.open; await sleep(100);
+  S.send({ t: 'tourCreate', settings: { gpm: 1, perTeam: 6 }, practice: true }); await sleep(600);
+  if (!S.tour || S.tour.teams.length !== 3) fail('practice tournament should have 3 teams');
   console.log('PASS', { table, matches: H.tour.matches.length, champion: H.tour.teams[H.tour.champion].name, errors: [...A.errors, ...H.errors] });
   srv.kill(); process.exit(0);
 })().catch(e => fail(e.message));

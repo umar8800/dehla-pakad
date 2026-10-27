@@ -45,16 +45,23 @@ function phone(n, { lazy = false } = {}) {
   for (const p of P.slice(1)) p.send({ t: 'join', code });
   await sleep(500);
   if (H.tour.players.length !== 8) fail('not 8 players: ' + H.tour.players.length);
-  // Mutual partner pick: H picks A, A picks H -> team.
+  // Everyone is paired automatically as they join (8 players -> 4 teams).
+  if (H.tour.teams.length !== 4) fail('auto-pairing did not make 4 teams: ' + H.tour.teams.length);
+  // Break a team, then re-form it by mutual pick.
   const id = n => H.tour.players.find(p => p.name === 'P' + n).id;
-  H.send({ t: 'tour', a: 'pick', id: id('A') }); await sleep(300);
-  if (H.tour.teams.length) fail('team formed on one-sided pick');
-  A.send({ t: 'tour', a: 'pick', id: id('H') }); await sleep(400);
-  if (H.tour.teams.length !== 1) fail('mutual pick did not form a team');
+  const pl = n => H.tour.players.find(p => p.name === 'P' + n);
+  const mate = H.tour.teams[pl('H').team].ids.find(i => i !== id('H'));
+  const M = P.find(p => id(p.n) === mate);
+  H.send({ t: 'tour', a: 'leaveTeam' }); await sleep(400);
+  if (H.tour.teams.length !== 3) fail('team did not break');
+  H.send({ t: 'tour', a: 'pick', id: mate }); await sleep(300);
+  if (H.tour.teams.length !== 3) fail('team formed on one-sided pick');
   B.send({ t: 'tour', a: 'start' }); await sleep(300);
   if (!B.errors.length) fail('non-host could start');
   H.send({ t: 'tour', a: 'start' }); await sleep(300);
   if (!H.errors.some(e => /team nahi bani/.test(e))) fail('started with solo players');
+  M.send({ t: 'tour', a: 'pick', id: id('H') }); await sleep(400);
+  if (H.tour.teams.length !== 4) fail('mutual pick did not form a team');
   H.send({ t: 'tour', a: 'randomize' }); await sleep(400);
   if (H.tour.teams.length !== 4) fail('randomize did not make 4 teams');
   H.send({ t: 'tour', a: 'teamName', team: 0, name: 'Kot Killers' });
