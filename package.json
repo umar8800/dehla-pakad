@@ -1,0 +1,15 @@
+{
+  "name": "dehla-pakad",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dehla Pakad (Mindi Coat house rules) for friends, played online.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node test/sim.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
