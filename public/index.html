@@ -192,7 +192,7 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .shame.sm{gap:3px;padding:2px 6px 2px 2px;border-radius:6px;transform:rotate(-2deg)} .shame.sm .dk{width:16px;height:18px} .shame.sm .tx{flex-direction:row;gap:3px;align-items:baseline} .shame.sm b{font-size:10.5px} .shame.sm em{font-size:14px}
 .baad{display:inline-flex;align-items:center;gap:4px;line-height:1;background:linear-gradient(180deg,#ffdf80,#e5a01d);color:#3a2205;border-radius:9px;padding:3px 7px;box-shadow:0 0 12px rgba(242,179,63,.4)}
 .baad .cr{font-size:14px} .baad .tx{display:flex;flex-direction:column;align-items:center}
-.baad b{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase} .baad em{font-style:normal;font-size:10px;font-weight:700;opacity:.8}
+.baad b{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase} .baad em{white-space:nowrap;font-style:normal;font-size:10px;font-weight:700;opacity:.8}
 .baad.lg{flex-direction:column;gap:2px;padding:4px 7px 5px} .baad.lg .cr{font-size:20px}
 .baad.md .cr{font-size:17px}
 .baad.sm{padding:2px 6px;border-radius:6px} .baad.sm .cr{font-size:11px} .baad.sm em{display:none}
@@ -754,7 +754,7 @@ const DONKEY='<svg class="dk" viewBox="0 0 40 44" aria-hidden="true"><path d="M1
 const kotBadge=(n,size,opp=0)=>{const z=size===false?'md':(size===true||size===undefined)?'sm':size;
   if(n) return `<span class="shame ${z}" title="${n} Kot"><span class="dk">${DONKEY}</span><span class="tx"><b>KOT</b><em>${n}</em></span></span>`;
   if(opp) return `<span class="baad ${z}" title="Kot diya"><span class="cr">👑</span><span class="tx"><b>King</b><em>Kot diya</em></span></span>`;
-  return `<span class="kz ${z}" title="Koi Kot nahi"><b>KOT</b><em class="nil">nahi</em></span>`;};
+  return `<span class="kz ${z}" title="Koi Kot nahi"><b>KOT</b><em>0</em></span>`;};
 const CREST=[['#f6c453','#8a5a00'],['#62d3b1','#0f5c49'],['#ff7e8c','#7a1424'],['#8fb3ff','#1d3f8a'],['#c59bff','#4b2382'],['#ffa45c','#7a3b06'],['#7ee07a','#1f5c1c'],['#f58ad8','#6e1a58']];
 const initials=n=>{const w=String(n||'?').trim().split(/\s+/);return (w.length>1?w[0][0]+w[1][0]:w[0].slice(0,2)).toUpperCase();};
 const kotScore=(a,b)=>`<span class="${a>b?'up':''}">${a}</span>–<span class="${b>a?'up':''}">${b}</span>`;
