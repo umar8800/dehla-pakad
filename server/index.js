@@ -115,11 +115,10 @@ wss.on('connection', ws => {
         if (!room || !Room.voiceReady || !room.settings.voice) return err('Voice chat abhi band hai');
         const seat = room.seatOf(client.pid), watching = room.watchers.has(client.pid);
         if (seat < 0 && !watching) return;
-        // Two channels: the whole table, or just your team (partners only).
-        const channel = m.channel === 'team' && seat >= 0 ? `dp-${room.code}-team${seat % 2}` : `dp-${room.code}`;
+        // One channel for the whole table, so partners can't talk privately.
         const at = new AccessToken(LK.key, LK.secret, { identity: seat >= 0 ? `seat-${seat}` : `watch-${client.pid.slice(0, 10)}`, name: client.name, ttl: '6h' });
-        at.addGrant({ roomJoin: true, room: channel, canPublish: seat >= 0, canSubscribe: true });
-        at.toJwt().then(token => send({ t: 'voiceToken', url: LK.url, token, channel: m.channel === 'team' && seat >= 0 ? 'team' : 'table' }))
+        at.addGrant({ roomJoin: true, room: `dp-${room.code}`, canPublish: seat >= 0, canSubscribe: true });
+        at.toJwt().then(token => send({ t: 'voiceToken', url: LK.url, token }))
           .catch(() => err('Voice shuru nahi ho paya'));
         return;
       }

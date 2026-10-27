@@ -197,6 +197,11 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .watchbar b{color:var(--ink)}
 .watchnote{border:1px dashed rgba(246,238,226,.3);border-radius:14px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
 .reactpop button[data-mute]{background:rgba(229,38,63,.2)}
+.micseg{display:flex;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:15px;padding:2px;gap:2px}
+.micseg button{border:none;background:none;height:26px;padding:0 9px;border-radius:12px;font-size:11.5px;font-weight:700;color:var(--muted);white-space:nowrap}
+.micseg button.on{background:var(--ink);color:var(--rail)}
+.ptt-big{display:block;width:100%;margin-top:6px;height:40px;border-radius:12px;border:1px solid rgba(126,224,122,.5);background:rgba(126,224,122,.12);color:var(--ink);font-weight:800;font-size:14px;touch-action:none;user-select:none;-webkit-user-select:none}
+.ptt-big.hold{background:var(--talk);color:#0b2a0a}
 .pv .baad{flex-direction:column;gap:2px;padding:4px 6px} .pv .baad .cr{font-size:15px}
 /* home, nav, profile */
 .homehead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 6px}
@@ -734,6 +739,7 @@ function av(icon){
 const APP={profile:null,speed:'Normal',timerSec:60,table:null,tour:null,voice:{mic:'PTT',speaker:true,channel:'Table'}};
 try{const p=JSON.parse(localStorage.getItem('dp-profile')||'null');if(p&&p.name)APP.profile=p;}catch(e){}
 try{const s=localStorage.getItem('dp-speed');if(SPEEDS[s])APP.speed=s;}catch(e){}
+try{const m=localStorage.getItem('dp-mic');if(['Open','Off','PTT'].includes(m))APP.voice.mic=m;}catch(e){}
 APP.stats={tw:0,finals:0,tours:0,tablesW:0,tablesP:0,kotGiven:0,kotTaken:0};
 try{Object.assign(APP.stats,JSON.parse(localStorage.getItem('dp-stats')||'{}'));}catch(e){}
 function bump(k,n=1){APP.stats[k]+=n;try{localStorage.setItem('dp-stats',JSON.stringify(APP.stats));}catch(e){}}
@@ -1156,7 +1162,7 @@ function mountVoice(host,talkEl){
   host.innerHTML=`<div class="voice"><button class="pill" data-v="mode" type="button">${V.mic==='Open'?'🎙 Open mic':V.mic==='PTT'?'🎙 Push-to-talk':'🔇 Mic off'}</button>
     ${V.mic==='PTT'?'<button class="pill ptt" data-v="talk" type="button">Dabake bolo</button>':''}
     <button class="pill" data-v="spk" type="button" aria-label="Speaker">${V.speaker?'🔈':'🔇'}</button>
-    <button class="pill" data-v="ch" type="button">${V.channel==='Table'?'Sab':'Sirf team'}</button><span class="note">Voice simulated</span></div>`;
+    <span class="note">Voice simulated</span></div>`;
   const q=k=>host.querySelector(`[data-v="${k}"]`),setTalk=on=>{const el=talkEl();if(el)el.classList.toggle('talk',on);};
   setTalk(V.mic==='Open');
   q('mode').addEventListener('click',()=>{V.mic=V.mic==='PTT'?'Open':V.mic==='Open'?'Off':'PTT';mountVoice(host,talkEl);toast(V.mic==='PTT'?'Push-to-talk: button dabake bolo':V.mic==='Open'?'Open mic: sab sun rahe hain':'Mic band');});
@@ -1164,7 +1170,6 @@ function mountVoice(host,talkEl){
   if(t){const down=()=>{t.classList.add('hold');setTalk(true);},up=()=>{t.classList.remove('hold');setTalk(false);};
     t.addEventListener('pointerdown',down);t.addEventListener('pointerup',up);t.addEventListener('pointerleave',up);t.addEventListener('pointercancel',up);}
   q('spk').addEventListener('click',()=>{V.speaker=!V.speaker;mountVoice(host,talkEl);toast(V.speaker?'Speaker on':'Speaker off');});
-  q('ch').addEventListener('click',()=>{V.channel=V.channel==='Table'?'Team':'Table';mountVoice(host,talkEl);toast(V.channel==='Table'?'Ab sab sun sakte hain':'Ab sirf tumhari team sunegi');});
 }
 function render(){
   if(!G.cfg) return;
@@ -1829,7 +1834,7 @@ function renderOLobby(){
     html+=`<div class="panel stack-v"><div><p class="lab">Table kitni der</p><div class="seg">${['games','time'].map(k=>`<button class="pill ${S.lengthType===k?'on':''}" data-lt="${k}" type="button">${k==='games'?'Games':'Time'}</button>`).join('')}</div></div>
       <div class="seg">${S.lengthType==='games'?[5,7,11].map(n=>`<button class="pill ${S.games===n?'on':''}" data-gn="${n}" type="button">${n} games</button>`).join(''):[[5,'5 min'],[30,'30 min'],[60,'1 ghanta']].map(([n,l])=>`<button class="pill ${S.minutes===n?'on':''}" data-mn="${n}" type="button">${l}</button>`).join('')}</div>
       <div class="row"><div><b>Dehle points dikhao</b><small>Sirf dikhenge, result Kot se hi hoga</small></div><button class="tog ${S.showDehle?'on':''}" id="olDehle" type="button" aria-label="Dehle points"></button></div>
-      <div class="row"><div><b>Voice chat</b><small>Sab ke saath ya sirf team ke saath baat karo</small></div><button class="tog ${S.voice?'on':''}" id="olVoiceTog" type="button" aria-label="Voice chat"></button></div></div>`;
+      <div class="row"><div><b>Voice chat</b><small>Poori table ek saath sunti hai</small></div><button class="tog ${S.voice?'on':''}" id="olVoiceTog" type="button" aria-label="Voice chat"></button></div></div>`;
     html+=`<button class="cta" type="button" id="olStart" ${full?'':'disabled'}>${full?'Table shuru karo':'Chaar players chahiye…'}</button>`;
   } else {
     html+=`<div class="panel"><p class="lab">Host ki settings</p><p style="margin:0;line-height:1.5">${S.lengthType==='games'?S.games+' games':S.minutes+' min'} · Sirf Kot count${S.showDehle?' · Dehle points dikhenge':''} · Voice ${S.voice?'on':'off'} · 60s timer</p></div>
@@ -1870,11 +1875,11 @@ function voiceWanted(){const st=NET.state;return !!(st&&st.voice&&NET.follow&&(!
 function voiceSync(){
   const st=NET.state;
   if(!voiceWanted()){ if(VOICE.room||VOICE.joinedFor) voiceLeave(); return; }
-  const key=`${st.code}-${VOICE.channel}-${st.me<0?'w':st.me}`;
+  const key=`${st.code}-${st.me<0?'w':st.me}`;
   if(VOICE.joinedFor===key||VOICE.connecting) return;
   if(VOICE.room) voiceLeave();
   VOICE.connecting=true; VOICE.joinedFor=key;
-  netSend({t:'voiceToken',channel:VOICE.channel});
+  netSend({t:'voiceToken'});
 }
 async function voiceOnToken(m){
   try{
@@ -1888,7 +1893,7 @@ async function voiceOnToken(m){
     room.on(LK.RoomEvent.Disconnected,()=>{if(VOICE.room===room){VOICE.room=null;VOICE.joinedFor=null;voiceBars();setTimeout(voiceSync,3000);}});
     await room.connect(m.url,m.token);
     if(!voiceWanted()){room.disconnect();return;}
-    VOICE.room=room; VOICE.channel=m.channel;
+    VOICE.room=room;
     VOICE.fails=0; await applyMic(false); applyVolumes(); voiceBars();
   }catch(e){ VOICE.joinedFor=null; if(!VOICE.fails++) toast('Voice chat jud nahi paya. Peeche se try karte rahenge.','them'); setTimeout(voiceSync,Math.min(60000,5000*VOICE.fails)); }
   finally{ VOICE.connecting=false; }
@@ -1915,22 +1920,20 @@ function mountVoiceReal(host){
   if(!st||!st.voice){host.innerHTML='';return;}
   const watching=st.me<0,r=VOICE.room;
   const status=r?(r.canPlaybackAudio?'':'<button class="pill on" data-v="unlock" type="button">🔈 Awaaz chalu karo</button>'):'<span class="note">Voice jud raha hai…</span>';
-  host.innerHTML=`<div class="voice">${watching?'<span class="note" style="margin:0">👀 Sirf sun sakte ho</span>':`<button class="pill" data-v="mode" type="button">${V.mic==='Open'?'🎙 Open mic':V.mic==='PTT'?'🎙 Push-to-talk':'🔇 Mic off'}</button>
-    ${V.mic==='PTT'?'<button class="pill ptt" data-v="talk" type="button">Dabake bolo</button>':''}`}
-    <button class="pill" data-v="spk" type="button" aria-label="Speaker">${V.speaker?'🔈':'🔇'}</button>
-    ${watching?'':`<button class="pill" data-v="ch" type="button">${VOICE.channel==='team'?'Sirf team':'Sab'}</button>`}${status}</div>`;
+  const seg=(k,l)=>`<button type="button" class="${V.mic===k?'on':''}" data-mic="${k}">${l}</button>`;
+  host.innerHTML=`<div class="voice">${watching?'<span class="note" style="margin:0">👀 Sirf sun sakte ho</span>':`<div class="micseg" role="group" aria-label="Mic">${seg('Open','🎙 On')}${seg('Off','🔇 Off')}${seg('PTT','✋ Push to talk')}</div>`}
+    <button class="pill" data-v="spk" type="button" aria-label="Speaker">${V.speaker?'🔈':'🔇'}</button>${status}</div>
+    ${!watching&&V.mic==='PTT'?'<button class="ptt-big" data-v="talk" type="button">✋ Dabake bolo</button>':''}`;
   const q=k=>host.querySelector(`[data-v="${k}"]`);
   if(q('unlock'))q('unlock').addEventListener('click',()=>{unlockAudio();setTimeout(voiceBars,300);});
-  if(q('mode'))q('mode').addEventListener('click',()=>{unlockAudio();V.mic=V.mic==='PTT'?'Open':V.mic==='Open'?'Off':'PTT';applyMic(false);voiceBars();
-    toast(V.mic==='PTT'?'Push-to-talk: button dabake bolo':V.mic==='Open'?'Open mic: sab sun rahe hain':'Mic band');});
+  host.querySelectorAll('[data-mic]').forEach(b=>b.addEventListener('click',()=>{unlockAudio();V.mic=b.dataset.mic;try{localStorage.setItem('dp-mic',V.mic);}catch(e){}applyMic(false);voiceBars();
+    toast(V.mic==='PTT'?'Push to talk: button dabake bolo':V.mic==='Open'?'Mic on: sab sun rahe hain':'Mic off');}));
   const t=q('talk');
   if(t){const down=e=>{e.preventDefault();unlockAudio();VOICE.holding=true;t.classList.add('hold');$('youLab').classList.add('talk');applyMic(true);},
     up=()=>{if(!VOICE.holding)return;VOICE.holding=false;t.classList.remove('hold');$('youLab').classList.remove('talk');applyMic(false);};
     t.addEventListener('pointerdown',down);t.addEventListener('pointerup',up);t.addEventListener('pointerleave',up);t.addEventListener('pointercancel',up);
     t.addEventListener('contextmenu',e=>e.preventDefault());}
   q('spk').addEventListener('click',()=>{unlockAudio();V.speaker=!V.speaker;applyVolumes();voiceBars();toast(V.speaker?'Speaker on':'Speaker off');});
-  if(q('ch'))q('ch').addEventListener('click',()=>{unlockAudio();VOICE.channel=VOICE.channel==='team'?'table':'team';voiceLeave();voiceSync();voiceBars();
-    toast(VOICE.channel==='table'?'Ab sab sun sakte hain':'Ab sirf tumhara partner sunega');});
 }
 function voiceMuteToggle(absSeat){
   const id='seat-'+absSeat;

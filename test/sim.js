@@ -50,11 +50,11 @@ function phone(n, opts = {}) {
   A.send({ t: 'host', a: 'settings', settings: { games: 5 } });
   A.send({ t: 'host', a: 'teamName', team: 0, name: 'Kot Killers' });
   A.send({ t: 'host', a: 'start' });
-  // Voice: a seated player gets a pass for the table channel and one for their team channel.
-  A.send({ t: 'voiceToken', channel: 'table' }); await sleep(150);
-  if (!A.voice || !A.voice.token || A.voice.channel !== 'table') fail('no table voice token');
+  // Voice: everyone gets the same table room, even if they ask for a team channel.
   A.send({ t: 'voiceToken', channel: 'team' }); await sleep(150);
-  if (A.voice.channel !== 'team') fail('no team voice token');
+  if (!A.voice || !A.voice.token) fail('no voice token');
+  const grant = JSON.parse(Buffer.from(A.voice.token.split('.')[1], 'base64url')).video;
+  if (grant.room !== 'dp-' + code) fail('voice is not one room for the whole table: ' + grant.room);
   // A fifth person joins a full table and watches without seeing any hand.
   const E = phone('E', { idle: true }); await E.open;
   E.send({ t: 'hello', pid: 'test-pid-E-xxxx', name: 'PE', icon: '🐼' }); await sleep(50);
