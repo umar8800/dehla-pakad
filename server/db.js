@@ -80,7 +80,7 @@ async function removeFriend(a, b) {
 async function playersByPid(pids) {
   if (!pids.length) return [];
   if (!enabled) return pids.map(p => mem.players.get(p)).filter(Boolean);
-  return (await call(`players?pid=in.(${pids.map(p => '"' + p.replace(/"/g, '') + '"').join(',')})&select=${PCOLS}`)) || [];
+  return (await call(`players?username=not.is.null&pid=in.(${pids.map(p => '"' + p.replace(/"/g, '') + '"').join(',')})&select=${PCOLS}`)) || [];
 }
 async function friendsOf(pid) {
   let ids;
@@ -118,7 +118,7 @@ const insertClaim = rec => call('prize_claims', { method: 'POST', headers: { pre
 const claimsFor = async code => (await call(`prize_claims?tour_code=eq.${encodeURIComponent(code)}&select=name,email,created_at&order=created_at`)) || [];
 
 const COLS = 'pid,name,icon,tw,finals,tours,tables_w,tables_p,games,kot_given,kot_taken,dehle,friends';
-const allPlayers = async () => (await call(`players?select=${COLS}&order=tw.desc,finals.desc,kot_given.desc,kot_taken.asc&limit=2000`)) || [];
+const allPlayers = async () => (await call(`players?select=${COLS}&username=not.is.null&order=tw.desc,finals.desc,kot_given.desc,kot_taken.asc&limit=2000`)) || [];
 const getPlayer = async pid => ((await call(`players?pid=eq.${encodeURIComponent(pid)}&select=${COLS}`)) || [])[0] || null;
 
 module.exports = { enabled, findByUsername, accountOf, createAccount, setIcon, findByFcode, addFriend, removeFriend, friendsOf, playedWith, upsertPlayer, bumpStats, saveSnapshot, deleteSnapshot, loadSnapshots, insertTournament, insertClaim, claimsFor, allPlayers, getPlayer };
