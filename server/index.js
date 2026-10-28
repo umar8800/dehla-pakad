@@ -12,10 +12,11 @@ const crypto = require('crypto');
 const hashPin = pin => { const salt = crypto.randomBytes(8).toString('hex'); return salt + ':' + crypto.scryptSync(pin, salt, 32).toString('hex'); };
 const checkPin = (pin, stored) => { const [salt, h] = stored.split(':'); try { return crypto.timingSafeEqual(Buffer.from(h, 'hex'), crypto.scryptSync(pin, salt, 32)); } catch { return false; } };
 const fails = new Map();
-const { AccessToken } = require('livekit-server-sdk');
+const { AccessToken, RoomServiceClient } = require('livekit-server-sdk');
 
 // Voice chat (LiveKit). Switched on only when all three keys are set on the server.
 const LK = { url: process.env.LIVEKIT_URL, key: process.env.LIVEKIT_API_KEY, secret: process.env.LIVEKIT_API_SECRET };
+const LKT = () => ({ url: LK.url.trim(), key: LK.key.trim(), secret: LK.secret.trim() });   // tolerate stray spaces/newlines
 Room.voiceReady = !!(LK.url && LK.key && LK.secret);
 const LK_CLIENT = path.join(__dirname, '..', 'node_modules', 'livekit-client', 'dist', 'livekit-client.umd.js');
 
@@ -221,18 +222,18 @@ wss.on('connection', ws => {
         if (m.ctx === 'tour') {
           if (!tour || !Room.voiceReady) return err('Voice chat abhi band hai');
           const p = tour.byPid(client.pid);
-          const at = new AccessToken(LK.key, LK.secret, { identity: p ? `tp-${p.id}` : `twatch-${client.pid.slice(0, 10)}`, name: client.name, ttl: '6h' });
+          const at = new AccessToken(LKT().key, LKT().secret, { identity: p ? `tp-${p.id}` : `twatch-${client.pid.slice(0, 10)}`, name: client.name, ttl: '6h' });
           at.addGrant({ roomJoin: true, room: `dp-t${tour.code}`, canPublish: !!p, canSubscribe: true });
-          at.toJwt().then(token => send({ t: 'voiceToken', url: LK.url, token })).catch(() => err('Voice shuru nahi ho paya'));
+          at.toJwt().then(token => send({ t: 'voiceToken', url: LKT().url, token })).catch(() => err('Voice shuru nahi ho paya'));
           return;
         }
         if (!room || !Room.voiceReady || !room.settings.voice) return err('Voice chat abhi band hai');
         const seat = room.seatOf(client.pid), watching = room.watchers.has(client.pid);
         if (seat < 0 && !watching) return;
         // One channel for the whole table, so partners can't talk privately.
-        const at = new AccessToken(LK.key, LK.secret, { identity: seat >= 0 ? `seat-${seat}` : `watch-${client.pid.slice(0, 10)}`, name: client.name, ttl: '6h' });
+        const at = new AccessToken(LKT().key, LKT().secret, { identity: seat >= 0 ? `seat-${seat}` : `watch-${client.pid.slice(0, 10)}`, name: client.name, ttl: '6h' });
         at.addGrant({ roomJoin: true, room: `dp-${room.code}`, canPublish: seat >= 0, canSubscribe: true });
-        at.toJwt().then(token => send({ t: 'voiceToken', url: LK.url, token }))
+        at.toJwt().then(token => send({ t: 'voiceToken', url: LKT().url, token }))
           .catch(() => err('Voice shuru nahi ho paya'));
         return;
       }
@@ -271,6 +272,9 @@ wss.on('connection', ws => {
         if (tour) tour.leave(client.pid);
         client.tour = null;
         return send({ t: 'tourLeft' });
+      case 'clientLog':                                 // errors from phones (voice etc.) for debugging
+        console.log(`client[${client.name}] ${String(m.where || '').slice(0, 20)}: ${String(m.msg || '').slice(0, 300)} · ${String(m.ua || '').slice(0, 120)}`);
+        return;
       case 'rank':
         rankings(client.pid).then(send);
         return;
@@ -353,5 +357,16 @@ async function restore() {
   console.log(`Restored ${rooms.size} tables and ${tours.size} tournaments`);
 }
 
+// Check the LiveKit keys once at startup so a wrong key/secret shows up in the logs.
+async function checkVoice() {
+  if (!Room.voiceReady) return;
+  const trimmed = [LK.url, LK.key, LK.secret].some(v => v !== v.trim());
+  try {
+    await new RoomServiceClient(LK.url.trim().replace(/^ws/, 'http'), LK.key.trim(), LK.secret.trim()).listRooms();
+    console.log(`LiveKit keys OK (${LK.url.trim()})${trimmed ? ' · note: spaces around a key were removed' : ''}`);
+  } catch (e) {
+    console.error(`LiveKit keys WRONG: ${e.message || e} · re-copy LIVEKIT_API_KEY and LIVEKIT_API_SECRET from the same LiveKit project as ${LK.url}`);
+  }
+}
 restore().finally(() => server.listen(PORT, () =>
-  console.log(`Dehla Pakad listening on ${PORT} · voice ${Room.voiceReady ? 'ON' : 'OFF (LiveKit keys missing)'} · database ${db.enabled ? 'ON' : 'OFF (Supabase keys missing)'}`)));
+  console.log(`Dehla Pakad listening on ${PORT} · voice ${Room.voiceReady ? 'ON' : 'OFF (LiveKit keys missing)'} · database ${db.enabled ? 'ON' : 'OFF (Supabase keys missing)'}`) || checkVoice()));

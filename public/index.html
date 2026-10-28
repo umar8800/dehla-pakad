@@ -2147,7 +2147,7 @@ async function voiceOnToken(m){
     if(!voiceWanted()){room.disconnect();return;}
     VOICE.room=room;
     VOICE.fails=0; await applyMic(false); applyVolumes(); voiceBars();
-  }catch(e){ VOICE.joinedFor=null; if(!VOICE.fails++) toast('Voice chat jud nahi paya. Peeche se try karte rahenge.','them'); setTimeout(voiceSync,Math.min(60000,5000*VOICE.fails)); }
+  }catch(e){ VOICE.joinedFor=null; if(VOICE.fails<3)netSend({t:'clientLog',where:'voice-connect',msg:String(e&&e.message||e),ua:navigator.userAgent}); if(!VOICE.fails++) toast('Voice chat jud nahi paya. Peeche se try karte rahenge.','them'); setTimeout(voiceSync,Math.min(60000,5000*VOICE.fails)); }
   finally{ VOICE.connecting=false; }
 }
 function voiceLeave(){const r=VOICE.room;VOICE.room=null;VOICE.joinedFor=null;if(r)r.disconnect();$('voiceAudio').innerHTML='';voiceLights([]);}
@@ -2194,7 +2194,7 @@ async function applyMic(hold){
   if(!r||!c||!c.talk) return;
   const on=APP.voice.mic==='Open'||(APP.voice.mic==='PTT'&&!!hold);
   try{ await r.localParticipant.setMicrophoneEnabled(on); }
-  catch(e){ APP.voice.mic='Off'; await micStatus(); if(MIC.state!=='granted') MIC.state='denied'; voiceBars(); micHelp(); }
+  catch(e){ netSend({t:'clientLog',where:'voice-mic',msg:(e&&e.name||'')+' '+String(e&&e.message||e),ua:navigator.userAgent}); APP.voice.mic='Off'; await micStatus(); if(MIC.state!=='granted') MIC.state='denied'; voiceBars(); micHelp(); }
 }
 function applyVolumes(){const r=VOICE.room;if(!r)return;r.remoteParticipants.forEach(p=>p.setVolume(APP.voice.speaker&&!VOICE.muted.has(p.identity)?1:0));}
 function unlockAudio(){if(VOICE.room)VOICE.room.startAudio().catch(()=>{});}
