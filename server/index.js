@@ -12,6 +12,26 @@ const crypto = require('crypto');
 const hashPin = pin => { const salt = crypto.randomBytes(8).toString('hex'); return salt + ':' + crypto.scryptSync(pin, salt, 32).toString('hex'); };
 const checkPin = (pin, stored) => { const [salt, h] = stored.split(':'); try { return crypto.timingSafeEqual(Buffer.from(h, 'hex'), crypto.scryptSync(pin, salt, 32)); } catch { return false; } };
 const fails = new Map();
+// Simple sliding-window counter: returns false once `max` hits happen inside `ms`.
+function limit(map, key, max, ms) {
+  const now = Date.now(), arr = (map.get(key) || []).filter(t => now - t < ms);
+  if (arr.length >= max) { map.set(key, arr); return false; }
+  arr.push(now); map.set(key, arr); return true;
+}
+// ---- admin email codes ----
+const RESEND_KEY = (process.env.RESEND_API_KEY || '').trim();
+const adminCodes = new Map();      // pid -> { hash, exp, tries }
+const sha = x => crypto.createHash('sha256').update(x).digest('hex');
+const maskEmail = e => e ? e.replace(/^(.)(.*)(.@.*)$/, (_, a, b, c) => a + '•'.repeat(Math.min(6, b.length)) + c) : null;
+async function sendAdminEmail(to, code) {
+  const res = await fetch(process.env.RESEND_URL || 'https://api.resend.com/emails', {   // RESEND_URL only for tests
+    method: 'POST', signal: AbortSignal.timeout(10_000),
+    headers: { authorization: `Bearer ${RESEND_KEY}`, 'content-type': 'application/json', 'user-agent': 'dehla-pakad-server' },
+    body: JSON.stringify({ from: 'Dehla Pakad <onboarding@resend.dev>', to: [to], subject: `Dehla Pakad admin code: ${code}`,
+      html: `<div style="font-family:system-ui,sans-serif;font-size:16px"><p>Tumhara admin login code:</p><p style="font-size:32px;font-weight:800;letter-spacing:6px">${code}</p><p>Ye code 10 minute tak chalega. Agar tumne login nahi kiya, toh is email ko ignore karo.</p></div>` }),
+  });
+  if (!res.ok) throw new Error(`email ${res.status} ${(await res.text()).slice(0, 160)}`);
+}
 const { AccessToken, RoomServiceClient } = require('livekit-server-sdk');
 
 // Voice chat (LiveKit). Switched on only when all three keys are set on the server.
@@ -108,8 +128,9 @@ async function friendsView(pid) {
   };
 }
 
-wss.on('connection', ws => {
-  const client = { ws, pid: null, name: 'Player', icon: '🙂', room: null, tour: null };
+wss.on('connection', (ws, req) => {
+  const client = { ws, pid: null, name: 'Player', icon: '🙂', room: null, tour: null,
+    ip: String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim() };
   clients.add(client);
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
@@ -163,15 +184,22 @@ wss.on('connection', ws => {
       if (!ok) return send({ t: 'authErr', text: `"${u}" pehle se kisi ka hai. Doosra username chuno.` });
       return send({ t: 'account', pid, name: u, icon });
     }
-    // login
-    const lock = fails.get(key);
-    if (lock && lock.n >= 5 && Date.now() - lock.at < 10 * 60_000) return send({ t: 'authErr', text: 'Bahut galat PIN. 10 minute baad try karo.' });
+    // login: max 20 tries per network address per 10 minutes, plus a per-account lock stored in the database
+    if (!limit(fails, 'ip:' + client.ip, 20, 10 * 60_000)) return send({ t: 'authErr', text: 'Bahut zyada koshish. 10 minute baad try karo.' });
     const p = await db.findByUsername(key);
+    if (p && p.pin_locked_until && new Date(p.pin_locked_until) > new Date()) {
+      const mins = Math.ceil((new Date(p.pin_locked_until) - Date.now()) / 60000);
+      return send({ t: 'authErr', text: `Bahut galat PIN. ${mins} minute baad try karo.` });
+    }
     if (!p || !p.pin_hash || !checkPin(String(m.pin), p.pin_hash)) {
-      fails.set(key, { n: (lock && Date.now() - lock.at < 10 * 60_000 ? lock.n : 0) + 1, at: Date.now() });
+      if (p) {
+        const n = (p.failed_pins || 0) + 1;
+        const lockMin = n >= 15 ? 24 * 60 : n >= 10 ? 60 : n % 5 === 0 ? 15 : 0;   // 5 wrong = 15 min, 10 = 1 h, 15+ = 1 day
+        await db.setPinFails(p.pid, n, lockMin ? new Date(Date.now() + lockMin * 60000).toISOString() : null);
+      }
       return send({ t: 'authErr', text: p ? 'PIN galat hai' : `"${u}" naam ka koi player nahi mila` });
     }
-    fails.delete(key);
+    if (p.failed_pins) db.setPinFails(p.pid, 0, null);
     send({ t: 'account', pid: p.pid, name: p.name, icon: p.icon || '🙂' });
   }
 
@@ -278,9 +306,39 @@ wss.on('connection', ws => {
         if (tour) tour.leave(client.pid);
         client.tour = null;
         return send({ t: 'tourLeft' });
+      case 'adminCode':                                 // email a one-time code / check it
+        db.adminInfo(client.pid).then(async info => {
+          if (!info) return err('Ye sirf admin ke liye hai');
+          if (m.a === 'send') {
+            if (!RESEND_KEY || !info.admin_email) return send({ t: 'adminAuth', need: true, email: maskEmail(info.admin_email), canEmail: false });
+            if (!limit(fails, 'code:' + client.pid, 3, 15 * 60_000)) return send({ t: 'adminAuth', need: true, email: maskEmail(info.admin_email), canEmail: true, error: 'Bahut codes bhej diye. 15 minute baad try karo.' });
+            const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+            adminCodes.set(client.pid, { hash: sha(code), exp: Date.now() + 10 * 60_000, tries: 0 });
+            try { await sendAdminEmail(info.admin_email, code); send({ t: 'adminAuth', need: true, sent: true, email: maskEmail(info.admin_email), canEmail: true }); }
+            catch (e) { console.error('admin email', e.message); send({ t: 'adminAuth', need: true, email: maskEmail(info.admin_email), canEmail: true, error: 'Email nahi gaya. Thodi der baad try karo.' }); }
+            return;
+          }
+          if (m.a === 'verify') {
+            const c = adminCodes.get(client.pid), code = String(m.code || '').replace(/\D/g, '');
+            const fail = text => send({ t: 'adminAuth', need: true, sent: !!c, email: maskEmail(info.admin_email), canEmail: !!RESEND_KEY, error: text });
+            if (!c || Date.now() > c.exp) { adminCodes.delete(client.pid); return fail('Code expire ho gaya. Naya code bhejo.'); }
+            if (++c.tries > 5) { adminCodes.delete(client.pid); return fail('Bahut galat koshish. Naya code bhejo.'); }
+            if (code.length !== 6 || !crypto.timingSafeEqual(Buffer.from(sha(code)), Buffer.from(c.hash))) return fail('Code galat hai');
+            adminCodes.delete(client.pid);
+            const token = crypto.randomBytes(32).toString('hex');
+            await db.adminDeviceAdd(sha(token), client.pid, String(m.device || '').slice(0, 60));
+            client.adminOk = true;
+            console.log(`admin verified on a new device for ${client.name}`);
+            return send({ t: 'adminToken', token });
+          }
+          if (m.a === 'revoke') { await db.adminDevicesRevoke(client.pid); client.adminOk = false; return send({ t: 'adminAuth', need: true, revoked: true, email: maskEmail(info.admin_email), canEmail: !!RESEND_KEY }); }
+        }).catch(e => { console.error('adminCode', e.message); err('Server error'); });
+        return;
       case 'admin':                                     // owner-only dashboard data
-        db.isAdmin(client.pid).then(async ok => {
-          if (!ok) return err('Ye sirf admin ke liye hai');
+        db.adminInfo(client.pid).then(async info => {
+          if (!info) return err('Ye sirf admin ke liye hai');
+          if (!client.adminOk && typeof m.token === 'string' && /^[0-9a-f]{64}$/.test(m.token) && await db.adminDeviceCheck(sha(m.token), client.pid)) client.adminOk = true;
+          if (!client.adminOk) return send({ t: 'adminAuth', need: true, email: maskEmail(info.admin_email), canEmail: !!RESEND_KEY && !!info.admin_email, badToken: !!m.token });
           const days = Math.min(90, Math.max(1, Number(m.days) || 30));
           const d = await db.adminData(days);
           const live = [...clients].filter(c => c.pid).map(c => ({ pid: c.pid, where: c.room ? (c.room.match ? 'Tournament match' : 'Table') + ' DP-' + c.room.code + ' · ' + c.room.phase : c.tour ? 'Tournament DP-' + c.tour.code + ' · ' + c.tour.phase : 'Home' }));

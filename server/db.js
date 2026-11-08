@@ -38,7 +38,7 @@ const bumpStats = rows => {
 };
 
 // ---------- accounts (username + PIN) ----------
-const ACOLS = 'pid,name,icon,username,pin_hash';
+const ACOLS = 'pid,name,icon,username,pin_hash,failed_pins,pin_locked_until';
 async function findByUsername(u) {
   if (!enabled) return [...mem.players.values()].find(p => p.username === u) || null;
   return ((await call(`players?username=eq.${encodeURIComponent(u)}&select=${ACOLS}`)) || [])[0] || null;
@@ -70,6 +70,32 @@ async function sessionStart(pid, device) {
 }
 const sessionsTouch = ids => !enabled ? mem.sessions.forEach(x => { if (ids.includes(x.id)) x.last_at = new Date().toISOString(); }) : ids.length ? call(`sessions?id=in.(${ids.map(Number).join(',')})`, { method: 'PATCH', headers: { prefer: 'return=minimal' }, body: JSON.stringify({ last_at: new Date().toISOString() }) }) : null;
 const logGame = rec => enabled ? call('games', { method: 'POST', headers: { prefer: 'return=minimal' }, body: JSON.stringify(rec) }) : mem.games.unshift({ ...rec, ended_at: new Date().toISOString() });
+// PIN lockout lives in the database so a server restart doesn't reset it.
+const setPinFails = (pid, n, until) => {
+  if (!enabled) { const p = mem.players.get(pid); if (p) { p.failed_pins = n; p.pin_locked_until = until; } return Promise.resolve(true); }
+  return call(`players?pid=eq.${encodeURIComponent(pid)}`, { method: 'PATCH', headers: { prefer: 'return=minimal' }, body: JSON.stringify({ failed_pins: n, pin_locked_until: until }) });
+};
+// Admin: email on file + trusted devices (token hashes, 30 days).
+async function adminInfo(pid) {
+  if (!enabled) { const p = mem.players.get(pid); return p && process.env.TEST_ADMIN && p.username === process.env.TEST_ADMIN ? { is_admin: true, admin_email: process.env.TEST_ADMIN_EMAIL || null } : null; }
+  const r = await call(`players?pid=eq.${encodeURIComponent(pid)}&select=is_admin,admin_email`);
+  return r && r[0] && r[0].is_admin ? r[0] : null;
+}
+async function adminDeviceAdd(hash, pid, device) {
+  const rec = { token_hash: hash, pid, device, expires_at: new Date(Date.now() + 30 * 86400_000).toISOString() };
+  if (!enabled) { (mem.adminDevices ||= new Map()).set(hash, rec); return true; }
+  return call('admin_devices', { method: 'POST', headers: { prefer: 'return=minimal' }, body: JSON.stringify(rec) });
+}
+async function adminDeviceCheck(hash, pid) {
+  if (!enabled) { const r = (mem.adminDevices || new Map()).get(hash); return !!(r && r.pid === pid && new Date(r.expires_at) > new Date()); }
+  const r = await call(`admin_devices?token_hash=eq.${hash}&pid=eq.${encodeURIComponent(pid)}&expires_at=gt.${new Date().toISOString()}&select=token_hash`);
+  if (r && r[0]) { call(`admin_devices?token_hash=eq.${hash}`, { method: 'PATCH', headers: { prefer: 'return=minimal' }, body: JSON.stringify({ last_used: new Date().toISOString() }) }); return true; }
+  return false;
+}
+async function adminDevicesRevoke(pid) {
+  if (!enabled) { for (const [k, r] of mem.adminDevices || []) if (r.pid === pid) mem.adminDevices.delete(k); return true; }
+  return call(`admin_devices?pid=eq.${encodeURIComponent(pid)}`, { method: 'DELETE' });
+}
 async function isAdmin(pid) {
   if (!enabled) { const p = mem.players.get(pid); return !!(p && process.env.TEST_ADMIN && p.username === process.env.TEST_ADMIN); }   // local tests only
   const r = await call(`players?pid=eq.${encodeURIComponent(pid)}&select=is_admin`);
@@ -147,4 +173,4 @@ const COLS = 'pid,name,icon,tw,finals,tours,tables_w,tables_p,games,kot_given,ko
 const allPlayers = async () => (await call(`players?select=${COLS}&username=not.is.null&order=tw.desc,finals.desc,kot_given.desc,kot_taken.asc&limit=2000`)) || [];
 const getPlayer = async pid => ((await call(`players?pid=eq.${encodeURIComponent(pid)}&select=${COLS}`)) || [])[0] || null;
 
-module.exports = { enabled, sessionStart, sessionsTouch, logGame, isAdmin, adminData, findByUsername, accountOf, createAccount, setIcon, findByFcode, addFriend, removeFriend, friendsOf, playedWith, upsertPlayer, bumpStats, saveSnapshot, deleteSnapshot, loadSnapshots, insertTournament, insertClaim, claimsFor, allPlayers, getPlayer };
+module.exports = { enabled, setPinFails, adminInfo, adminDeviceAdd, adminDeviceCheck, adminDevicesRevoke, sessionStart, sessionsTouch, logGame, isAdmin, adminData, findByUsername, accountOf, createAccount, setIcon, findByFcode, addFriend, removeFriend, friendsOf, playedWith, upsertPlayer, bumpStats, saveSnapshot, deleteSnapshot, loadSnapshots, insertTournament, insertClaim, claimsFor, allPlayers, getPlayer };

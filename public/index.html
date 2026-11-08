@@ -976,7 +976,7 @@ function renderMe(){
   const ma=$('meAdmin');if(ma)ma.addEventListener('click',openAdmin);
   $('meTips').addEventListener('click',()=>{TIPS.reset();toast('Tips wapas aa gaye. Home pe chalo.');goHome();});
   $('meLogout').addEventListener('click',()=>openSheet(`<h2>Logout karein?</h2><p>Is phone se account hat jayega. Wapas aane ke liye username + PIN chahiye hoga.</p><button class="cta" data-act="out" type="button">Haan, logout</button><button class="cta ghost" data-act="close" type="button">Nahi</button>`,{out:()=>{
-    ['dp-acct','dp-pid','dp-profile'].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});location.reload();}}));
+    ['dp-acct','dp-pid','dp-profile','dp-admin'].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});location.reload();}}));
   $('meSave').addEventListener('click',()=>{
     APP.profile={name:APP.profile.name,icon:D.icon};
     try{localStorage.setItem('dp-profile',JSON.stringify(APP.profile));}catch(e){}
@@ -995,7 +995,26 @@ const UK=d=>new Date(d).toLocaleString('en-GB',{timeZone:'Europe/London',day:'nu
 const UKday=d=>new Date(d).toLocaleDateString('en-GB',{timeZone:'Europe/London',day:'numeric',month:'short'});
 const ago=d=>{if(!d)return '—';const m=(Date.now()-new Date(d))/60000;if(m<2)return 'abhi';if(m<60)return Math.round(m)+' min pehle';if(m<1440)return Math.round(m/60)+' ghante pehle';return Math.round(m/1440)+' din pehle';};
 const dur=sec=>{sec=Math.round(sec);if(sec<60)return sec+'s';const m=Math.round(sec/60);if(m<60)return m+' min';return Math.floor(m/60)+'h '+(m%60)+'m';};
-function openAdmin(){if(!APP.admin){toast('Ye sirf admin ke liye hai','them');return;}stopSim();clearTimer();G.token++;show('scr-admin');$('adBody').innerHTML='<div class="panel"><p class="muted" style="margin:0">Data aa raha hai…</p></div>';netSend({t:'admin',days:ADMIN.days});}
+const adminToken=()=>{try{return localStorage.getItem('dp-admin')||'';}catch(e){return '';}};
+function adminAsk(){netSend({t:'admin',days:ADMIN.days,token:adminToken()});}
+function openAdmin(){if(!APP.admin){toast('Ye sirf admin ke liye hai','them');return;}stopSim();clearTimer();G.token++;show('scr-admin');$('adBody').innerHTML='<div class="panel"><p class="muted" style="margin:0">Data aa raha hai…</p></div>';adminAsk();}
+function onAdminAuth(m){
+  if(m.badToken){try{localStorage.removeItem('dp-admin');}catch(e){}}
+  if($('scr-admin').hidden)return;
+  const em=m.email?esc(m.email):'(email set nahi)';
+  $('adBody').innerHTML=`<div class="panel"><p class="lab">🔒 Admin verification</p>
+    <p style="margin:0 0 10px">Is phone pe admin kholne ke liye, <b>${em}</b> pe ek 6-digit code jayega. Ek baar verify karne ke baad ye phone 30 din yaad rahega.</p>
+    ${m.revoked?'<p class="fieldnote good">Sab phones se admin access hata diya gaya.</p>':''}
+    ${!m.canEmail?'<p class="fieldnote bad">Email service abhi set nahi hai, isliye admin band hai. (Server pe RESEND_API_KEY chahiye.)</p>':`
+      <button class="cta ${m.sent?'ghost':''}" id="adSend" type="button">${m.sent?'Code dobara bhejo':'Code bhejo'}</button>
+      ${m.sent?`<p class="fieldnote good" style="margin:8px 0">Code bhej diya. Email check karo (spam folder bhi).</p>
+      <input class="input pin" id="adCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••" style="max-width:220px;letter-spacing:.4em">
+      <button class="cta" id="adVerify" type="button" style="margin-top:10px">Verify karo</button>`:''}`}
+    ${m.error?`<p class="fieldnote bad" style="margin-top:8px">${esc(m.error)}</p>`:''}</div>`;
+  const sb=$('adSend');if(sb)sb.addEventListener('click',()=>{sb.disabled=true;sb.textContent='Bhej rahe hain…';netSend({t:'adminCode',a:'send'});});
+  const ci=$('adCode');if(ci){ci.focus();ci.addEventListener('input',()=>{ci.value=ci.value.replace(/\D/g,'').slice(0,6);if(ci.value.length===6)$('adVerify').click();});}
+  const vb=$('adVerify');if(vb)vb.addEventListener('click',()=>{const c=($('adCode').value||'').trim();if(c.length!==6){toast('6 numbers ka code daalo','them');return;}vb.disabled=true;vb.textContent='Check kar rahe hain…';netSend({t:'adminCode',a:'verify',code:c,device:navigator.userAgent.slice(0,60)});});
+}
 function onAdmin(m){ADMIN.data=m;if(!$('scr-admin').hidden)renderAdmin();}
 function adminModel(){
   const D=ADMIN.data,P=new Map();
@@ -1078,10 +1097,12 @@ function renderAdmin(){
   }
   $('adBody').innerHTML=`<div class="chiprow">${[1,7,30,90].map(d=>`<button class="pill sm ${days===d?'on':''}" data-days="${d}" type="button">${d===1?'Aaj':d+' din'}</button>`).join('')}<button class="pill sm" id="adRefresh" type="button">↻</button></div>
     <div class="segtabs">${tabs.map(([k,l])=>`<button type="button" class="${ADMIN.tab===k?'on':''}" data-atab="${k}">${l}</button>`).join('')}</div>${body}
-    <p class="fieldnote">Updated ${UK(D.now)} · Offline (bots) games phone pe hi chalte hain, unka data yahan nahi aata.</p>`;
+    <p class="fieldnote">Updated ${UK(D.now)} · Offline (bots) games phone pe hi chalte hain, unka data yahan nahi aata.</p>
+    <button class="cta ghost" id="adRevoke" type="button">🔒 Sab phones se admin access hatao</button>`;
   const b=$('adBody');
-  b.querySelectorAll('[data-days]').forEach(x=>x.addEventListener('click',()=>{ADMIN.days=+x.dataset.days;netSend({t:'admin',days:ADMIN.days});x.textContent='…';}));
-  $('adRefresh').addEventListener('click',()=>netSend({t:'admin',days:ADMIN.days}));
+  b.querySelectorAll('[data-days]').forEach(x=>x.addEventListener('click',()=>{ADMIN.days=+x.dataset.days;adminAsk();x.textContent='…';}));
+  $('adRefresh').addEventListener('click',adminAsk);
+  $('adRevoke').addEventListener('click',()=>openSheet(`<h2>Sab phones se admin hatao?</h2><p>Har phone pe dobara email code chahiye hoga, is phone pe bhi.</p><button class="cta" data-act="go" type="button">Haan, hatao</button><button class="cta ghost" data-act="close" type="button">Nahi</button>`,{go:()=>{closeSheet();try{localStorage.removeItem('dp-admin');}catch(e){}netSend({t:'adminCode',a:'revoke'});}}));
   b.querySelectorAll('[data-atab]').forEach(x=>x.addEventListener('click',()=>{ADMIN.tab=x.dataset.atab;renderAdmin();}));
   b.querySelectorAll('[data-sort]').forEach(x=>x.addEventListener('click',()=>{ADMIN.sort=x.dataset.sort;renderAdmin();}));
   b.querySelectorAll('[data-u]').forEach(x=>x.addEventListener('click',()=>adminUser(P.get(x.dataset.u),P)));
@@ -2081,6 +2102,8 @@ function netOnMessage(m){
   if(m.t==='nameFree'){const st=$('meUserSt');if(st&&ME.onboard&&ME.mode!=='login'&&m.username===ME.user){st.className='fieldnote '+(m.free?'good':'bad');st.textContent=m.free?`✅ "${m.username}" available hai`:`❌ "${m.username}" pehle se kisi ka hai`;}return;}
   if(m.t==='needAccount'){APP.acct=false;try{localStorage.removeItem('dp-acct');}catch(e){}closeSheet();openMe(true);toast('Naya account banao ya login karo');return;}
   if(m.t==='adminData'){onAdmin(m);return;}
+  if(m.t==='adminAuth'){onAdminAuth(m);return;}
+  if(m.t==='adminToken'){try{localStorage.setItem('dp-admin',m.token);}catch(e){}toast('Verify ho gaya ✅');adminAsk();return;}
   if(m.t==='me'){APP.admin=!!m.admin;if(APP.admin&&location.pathname.replace(/\/$/,'')==='/admin'&&!ADMIN.opened){ADMIN.opened=true;openAdmin();}if(APP.profile&&m.name&&APP.profile.name!==m.name){APP.profile.name=m.name;try{localStorage.setItem('dp-profile',JSON.stringify(APP.profile));}catch(e){}}return;}
   if(m.t==='hi'){ if(NET.pendingJoin){netSend({t:'join',code:NET.pendingJoin});NET.pendingJoin=null;} return; }
   if(m.t==='tour'){

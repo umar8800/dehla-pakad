@@ -38,7 +38,7 @@ function phone() {
   if (A.last('me').name !== 'Umar') fail('name must come from the account');
   for (let i = 0; i < 5; i++) { B.send({ t: 'login', username: 'umar', pin: '9999' }); await sleep(60); }
   B.send({ t: 'login', username: 'umar', pin: '4321' }); await sleep(150);
-  if (!/10 minute/.test(B.last('authErr').text)) fail('no lockout after 5 wrong PINs');
+  if (!/minute baad/.test(B.last("authErr").text)) fail('no lockout after 5 wrong PINs');
   console.log('PASS accounts');
   srv.kill(); process.exit(0);
 })().catch(e => fail(e.message));
