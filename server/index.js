@@ -368,5 +368,6 @@ async function checkVoice() {
     console.error(`LiveKit keys WRONG: ${e.message || e} · re-copy LIVEKIT_API_KEY and LIVEKIT_API_SECRET from the same LiveKit project as ${LK.url}`);
   }
 }
-restore().finally(() => server.listen(PORT, () =>
+// Never let a slow database keep the server from opening: start after restore, or after 10s at most.
+Promise.race([restore().catch(e => console.error('restore', e.message)), new Promise(r => setTimeout(r, 10_000))]).finally(() => server.listen(PORT, () =>
   console.log(`Dehla Pakad listening on ${PORT} · voice ${Room.voiceReady ? 'ON' : 'OFF (LiveKit keys missing)'} · database ${db.enabled ? 'ON' : 'OFF (Supabase keys missing)'}`) || checkVoice()));

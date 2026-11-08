@@ -13,7 +13,7 @@ function headers(extra = {}) {
 async function call(path, opts = {}) {
   if (!enabled) return null;
   try {
-    const res = await fetch(`${URL_}/rest/v1/${path}`, { ...opts, headers: headers(opts.headers) });
+    const res = await fetch(`${URL_}/rest/v1/${path}`, { ...opts, headers: headers(opts.headers), signal: AbortSignal.timeout(8000) });
     if (!res.ok) { console.error('db', path.split('?')[0], res.status, (await res.text()).slice(0, 200)); return null; }
     const text = await res.text();
     return text ? JSON.parse(text) : true;
