@@ -6,7 +6,7 @@ const PORT = 3994, MAILPORT = 3993;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let lastMail = null;
 const mail = http.createServer((req, res) => { let b = ''; req.on('data', d => b += d); req.on('end', () => { lastMail = { auth: req.headers.authorization, body: JSON.parse(b) }; res.end('{"id":"x"}'); }); }).listen(MAILPORT);
-const srv = spawn('node', ['server/index.js'], { env: { ...process.env, PORT, SUPABASE_URL: '', LIVEKIT_URL: '', TEST_ADMIN: 'boss', TEST_ADMIN_EMAIL: 'boss@example.com', RESEND_API_KEY: 're_test', RESEND_URL: `http://localhost:${MAILPORT}/emails` }, stdio: ['ignore', 'ignore', 'inherit'] });
+const srv = spawn('node', ['server/index.js'], { env: { ...process.env, PORT, SUPABASE_URL: '', LIVEKIT_URL: '', TEST_ADMIN: 'boss', TEST_ADMIN_EMAIL: 'boss@example.com', RESEND_API_KEY: 're_test', RESEND_URL: `http://localhost:${MAILPORT}/emails`, USAGE_MS: '400' }, stdio: ['ignore', 'ignore', 'inherit'] });
 const fail = m => { console.error('FAIL:', m); srv.kill(); mail.close(); process.exit(1); };
 function phone() {
   const ws = new WebSocket(`ws://localhost:${PORT}/ws`), P = { msgs: [] };
@@ -59,6 +59,13 @@ async function account(name, pin) {
   X.send({ t: 'admin', token }); await sleep(150);
   if (X.last('adminData')) fail('token worked on another account');
 
+  // usage meter: bandwidth and email codes recorded, only for a verified admin
+  await sleep(900);
+  A.send({ t: 'adminUsage' }); await sleep(250);
+  const U = A.last('adminUsage');
+  if (!U || !U.daily.length || !(U.daily[0].ws_bytes > 0) || U.daily[0].codes !== 1) fail('usage not recorded: ' + JSON.stringify(U && U.daily));
+  X.send({ t: 'adminUsage' }); await sleep(150);
+  if (X.last('adminUsage')) fail('non-admin got usage');
   // revoke everywhere
   A.send({ t: 'adminCode', a: 'revoke' }); await sleep(200);
   const { P: A4 } = await account('boss', '4321');

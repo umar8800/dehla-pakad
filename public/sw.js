@@ -1,5 +1,5 @@
 // Keeps the app shell available offline so offline practice works without internet.
-const CACHE = 'dp-v1';
+const CACHE = 'dp-v2';
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/', '/manifest.webmanifest', '/icon-192.png'])));
   self.skipWaiting();

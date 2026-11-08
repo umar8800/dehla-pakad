@@ -7,7 +7,7 @@
 <meta name="description" content="Dehla Pakad: Mindi Coat with friends.">
 <meta property="og:title" content="Dehla Pakad · Friends ke saath Mindi Coat">
 <meta property="og:description" content="Online table, voice chat aur tournaments. Tap karo aur seedha join karo.">
-<meta property="og:image" content="%ORIGIN%/og.png">
+<meta property="og:image" content="%ORIGIN%/og.jpg">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#1a1225">
@@ -148,6 +148,10 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .adnums{display:flex;gap:8px;flex:none}.adnums span{display:flex;flex-direction:column;align-items:center;font-size:10.5px;color:var(--muted);min-width:34px}.adnums b{font-size:14px;color:var(--ink)}
 .adg{border-top:1px solid var(--line);padding:10px 0}.adg:first-child{border-top:none}.adg small{color:var(--muted);font-size:11.5px}
 .adteams{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;font-size:12.5px;margin-top:4px}.adteams>b{font-size:16px}.adteams span:last-child{text-align:right}
+.admeter{padding:8px 0}.admeter .row span{font-size:13px;color:var(--muted)}.admeter .bar{position:relative;height:10px;border-radius:6px;background:rgba(246,238,226,.08);overflow:hidden;margin:6px 0 4px}
+.admeter .bar i{position:absolute;left:0;top:0;bottom:0;background:#62d3b1;border-radius:6px}.admeter .bar u{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,rgba(98,211,177,.35) 0 4px,transparent 4px 8px)}
+.admeter.warn .bar i{background:#ff7a8a}.admeter.warn .bar u{background:repeating-linear-gradient(45deg,rgba(255,122,138,.4) 0 4px,transparent 4px 8px)}.admeter small{font-size:11.5px;color:var(--muted)}
+.adlimits{display:grid;gap:8px;margin-top:8px}.adlimits div{display:flex;flex-direction:column;font-size:12.5px}.adlimits span{color:var(--muted)}
 .kotnote{display:block;margin-top:3px;color:#ff9aa6!important}
 .lteams{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.lteams>*{min-width:0}
 .lteam{border:1px solid var(--line);border-radius:14px;padding:10px;background:rgba(0,0,0,.2)}
@@ -1055,7 +1059,7 @@ function renderAdmin(){
   const f1=users.length,f2=users.filter(u=>u.sess.length>=2||u.games>0).length,f3=users.filter(u=>u.games>0).length,f4=users.filter(u=>u.games>=5).length;
   const fun=[['Signed up',f1],['Wapas aaye (2+ visits)',f2],['1+ game khela',f3],['5+ games',f4]];
   const devices={};allSess.forEach(x=>{const k=(x.device||'—').split(' · ')[0];devices[k]=(devices[k]||0)+1;});
-  const tabs=[['overview','Overview'],['players','Players'],['games','Games'],['live','Live']];
+  const tabs=[['overview','Overview'],['players','Players'],['games','Games'],['live','Live'],['usage','Limits']];
   let body='';
   if(ADMIN.tab==='overview'){
     body=`<div class="adkpis">
@@ -1090,6 +1094,7 @@ function renderAdmin(){
       <div class="adteams"><span>${esc(tn[0]||'A')}: ${who(t0)}</span><b>${r.a}–${r.b}</b><span>${esc(tn[1]||'B')}: ${who(t1)}</span></div>
       ${r.kotTo!=null?`<small class="kotnote">Kot: ${esc(tn[r.kotTo]||'')}</small>`:''}</div>`;}).join('')||'<p class="muted" style="margin:0">Is range mein koi game nahi.</p>'}</div>`;
   }
+  if(ADMIN.tab==='usage') body=usageHTML(P);
   if(ADMIN.tab==='live'){
     body=`<div class="panel"><p class="lab">Online abhi (${D.live.length})</p>${D.live.map(l=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><b>${nm(l.id)}</b><small>${esc(l.where)}</small></div>`).join('')||'<p class="muted" style="margin:0">Koi online nahi.</p>'}</div>
     <div class="panel"><p class="lab">Chal rahi tables (${D.rooms.length})</p>${D.rooms.map(r=>`<div style="padding:6px 0;border-top:1px solid var(--line)"><div class="row"><b>DP-${esc(r.code)}${r.match?' · match':''}</b><small>${esc(r.phase)}${r.watchers?' · 👀 '+r.watchers:''}</small></div><small class="muted">${r.seats.map(x=>x?(x.bot?'🤖':x.on?'🟢':'⚪')+esc(x.name):'—').join(' · ')}</small></div>`).join('')||'<p class="muted" style="margin:0">Koi table nahi.</p>'}</div>
@@ -1103,9 +1108,45 @@ function renderAdmin(){
   b.querySelectorAll('[data-days]').forEach(x=>x.addEventListener('click',()=>{ADMIN.days=+x.dataset.days;adminAsk();x.textContent='…';}));
   $('adRefresh').addEventListener('click',adminAsk);
   $('adRevoke').addEventListener('click',()=>openSheet(`<h2>Sab phones se admin hatao?</h2><p>Har phone pe dobara email code chahiye hoga, is phone pe bhi.</p><button class="cta" data-act="go" type="button">Haan, hatao</button><button class="cta ghost" data-act="close" type="button">Nahi</button>`,{go:()=>{closeSheet();try{localStorage.removeItem('dp-admin');}catch(e){}netSend({t:'adminCode',a:'revoke'});}}));
-  b.querySelectorAll('[data-atab]').forEach(x=>x.addEventListener('click',()=>{ADMIN.tab=x.dataset.atab;renderAdmin();}));
+  b.querySelectorAll('[data-atab]').forEach(x=>x.addEventListener('click',()=>{ADMIN.tab=x.dataset.atab;renderAdmin();if(ADMIN.tab==='usage')netSend({t:'adminUsage'});}));
   b.querySelectorAll('[data-sort]').forEach(x=>x.addEventListener('click',()=>{ADMIN.sort=x.dataset.sort;renderAdmin();}));
   b.querySelectorAll('[data-u]').forEach(x=>x.addEventListener('click',()=>adminUser(P.get(x.dataset.u),P)));
+}
+const LIMITS={voice:5000,voiceConc:100,bw:5*1024**3,db:500*1024**2,codesDay:100};
+const fmtB=b=>b>=1024**3?(b/1024**3).toFixed(2)+' GB':b>=1024**2?(b/1024**2).toFixed(1)+' MB':Math.round(b/1024)+' KB';
+function meter(label,used,max,fmt,proj,note){
+  const pct=Math.min(100,used/max*100),pp=proj!=null?Math.min(100,proj/max*100):null,warn=(proj!=null?proj:used)>=max*.8;
+  return `<div class="admeter ${warn?'warn':''}"><div class="row"><b>${label}</b><span>${fmt(used)} / ${fmt(max)}</span></div>
+    <div class="bar"><i style="width:${pct}%"></i>${pp!=null&&pp>pct?`<u style="left:${pct}%;width:${pp-pct}%"></u>`:''}</div>
+    <small>${proj!=null?`Is speed se mahine ke end tak ~${fmt(proj)} (${Math.round(proj/max*100)}%)`:''}${note?(proj!=null?' · ':'')+note:''}</small></div>`;
+}
+function usageHTML(P){
+  const U=ADMIN.usage;if(!U)return '<div class="panel"><p class="muted" style="margin:0">Usage aa raha hai…</p></div>';
+  const now=new Date(U.now),mk=now.toISOString().slice(0,7),dom=now.getUTCDate(),dim=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,0)).getUTCDate();
+  const month=U.daily.filter(d=>String(d.day).slice(0,7)===mk),sum=k=>month.reduce((a,d)=>a+Number(d[k]||0),0);
+  const vMin=sum('voice_min'),mic=sum('mic_min'),bw=sum('http_bytes')+sum('ws_bytes'),peak=Math.max(0,...month.map(d=>d.peak_voice||0));
+  const today=U.daily.find(d=>String(d.day)===now.toISOString().slice(0,10))||{};
+  const proj=x=>dom?x/dom*dim:x;
+  const nm=id=>{const u=P.get(id);return u?esc(u.name):'?';};
+  const vu=[...U.voice].sort((a,b)=>b.minutes-a.minutes);
+  const keys=[],labels=[];for(let i=1;i<=dom;i++){const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),i)).toISOString().slice(0,10);keys.push(d);labels.push(i+'');}
+  const vDay=keys.map(k=>{const d=U.daily.find(x=>String(x.day)===k);return d?d.voice_min:0;});
+  return `<div class="panel"><p class="lab">Voice chat · LiveKit free plan</p>
+      ${meter('Voice minutes is mahine',vMin,LIMITS.voice,x=>Math.round(x)+' min',proj(vMin),`${vMin?Math.round(mic/vMin*100):0}% time mic on tha`)}
+      ${meter('Ek saath voice pe (peak)',peak,LIMITS.voiceConc,x=>Math.round(x)+' log',null,`Abhi ${U.voiceNow} log voice pe`)}
+      <p class="fieldnote">Limit poori hone par voice 1 tareekh tak band ho jayega (koi charge nahi). Har jude hue minute ki ginti hoti hai, mic off ho tab bhi.</p></div>
+    <div class="panel"><p class="lab">Roz ke voice minutes (is mahine)</p>${bars(vDay,labels,'#62d3b1',70)}</div>
+    <div class="panel"><p class="lab">Kaun kitna voice use kar raha hai (is mahine)</p>${vu.length?vu.map(v=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><b>${nm(v.id)}</b><span>${v.minutes} min <small class="muted">· mic ${v.mic_minutes} min</small></span></div>`).join(''):'<p class="muted" style="margin:0">Is mahine abhi tak koi voice use nahi hua (ya tracking abhi shuru hui hai).</p>'}</div>
+    <div class="panel"><p class="lab">Baaki limits</p>
+      ${meter('Bandwidth (Render free)',bw,LIMITS.bw,fmtB,proj(bw),'App ka apna hisaab; Render ka meter thoda alag ho sakta hai')}
+      ${meter('Database (Supabase free)',U.dbBytes,LIMITS.db,fmtB,null,'')}
+      ${meter('Admin code emails aaj (Resend)',today.codes||0,LIMITS.codesDay,x=>x+'',null,U.emailOn?'':'Email service off')}
+      <div class="adlimits">
+        <div><b>Server sleep</b><span>Free Render server 15 min khali rehne par so jata hai, jaagne mein ~1 min.</span></div>
+        <div><b>Server hours</b><span>750 free ghante/mahina. Ek server ke liye kaafi.</span></div>
+        <div><b>Database pause</b><span>Supabase 7 din bilkul khali rahe toh pause. Games chalte rahein toh nahi hoga.</span></div>
+        <div><b>Domain</b><span>dehlapakad.com renew: 27 Oct 2027.</span></div>
+      </div></div>`;
 }
 function adminUser(u,P){
   if(!u)return;
@@ -2103,6 +2144,7 @@ function netOnMessage(m){
   if(m.t==='needAccount'){APP.acct=false;try{localStorage.removeItem('dp-acct');}catch(e){}closeSheet();openMe(true);toast('Naya account banao ya login karo');return;}
   if(m.t==='adminData'){onAdmin(m);return;}
   if(m.t==='adminAuth'){onAdminAuth(m);return;}
+  if(m.t==='adminUsage'){ADMIN.usage=m;if(!$('scr-admin').hidden&&ADMIN.tab==='usage')renderAdmin();return;}
   if(m.t==='adminToken'){try{localStorage.setItem('dp-admin',m.token);}catch(e){}toast('Verify ho gaya ✅');adminAsk();return;}
   if(m.t==='me'){APP.admin=!!m.admin;if(APP.admin&&location.pathname.replace(/\/$/,'')==='/admin'&&!ADMIN.opened){ADMIN.opened=true;openAdmin();}if(APP.profile&&m.name&&APP.profile.name!==m.name){APP.profile.name=m.name;try{localStorage.setItem('dp-profile',JSON.stringify(APP.profile));}catch(e){}}return;}
   if(m.t==='hi'){ if(NET.pendingJoin){netSend({t:'join',code:NET.pendingJoin});NET.pendingJoin=null;} return; }
@@ -2352,15 +2394,17 @@ function loadLK(){
 }
 function voiceCtx(){
   const st=NET.state;
-  if(st&&st.voice&&NET.follow&&st.phase!=='ready'&&(!$('scr-olobby').hidden||!$('scr-game').hidden)) return {kind:'room',key:`r${st.code}-${st.me<0?'w':st.me}`,talk:st.me>=0};
+  if(st&&st.voice&&NET.follow&&st.phase!=='ready'&&(!$('scr-olobby').hidden||!$('scr-game').hidden)) return {kind:'room',scope:'r'+st.code,n:st.voiceN||0,key:`r${st.code}-${st.me<0?'w':st.me}`,talk:st.me>=0};
   const T=typeof TOUR!=='undefined'&&TOUR.state;
-  if(T&&T.voice&&(!$('scr-lobby').hidden||!$('scr-dash').hidden)) return {kind:'tour',key:`t${T.code}-${T.meId}`,talk:!T.watching};
+  if(T&&T.voice&&(!$('scr-lobby').hidden||!$('scr-dash').hidden)) return {kind:'tour',scope:'t'+T.code,n:T.voiceN||0,key:`t${T.code}-${T.meId}`,talk:!T.watching};
   return null;
 }
 function voiceWanted(){return !!voiceCtx();}
+// Voice connects only after a tap ("Voice join karo") and pauses while the phone is put away:
+// every connected minute counts against the free monthly allowance, even with mic and speaker off.
 function voiceSync(){
   const c=voiceCtx();
-  if(!c){ if(VOICE.room||VOICE.joinedFor) voiceLeave(); return; }
+  if(!c||VOICE.optIn!==c.scope||VOICE.away){ if(VOICE.room||VOICE.joinedFor) voiceLeave(); return; }
   const key=c.key;
   if(VOICE.joinedFor===key||VOICE.connecting) return;
   if(VOICE.room) voiceLeave();
@@ -2381,9 +2425,15 @@ async function voiceOnToken(m){
     if(!voiceWanted()){room.disconnect();return;}
     VOICE.room=room;
     VOICE.fails=0; await applyMic(false); applyVolumes(); voiceBars();
-  }catch(e){ VOICE.joinedFor=null; if(VOICE.fails<3)netSend({t:'clientLog',where:'voice-connect',msg:String(e&&e.message||e),ua:navigator.userAgent}); if(!VOICE.fails++) toast('Voice chat jud nahi paya. Peeche se try karte rahenge.','them'); setTimeout(voiceSync,Math.min(60000,5000*VOICE.fails)); }
+  }catch(e){ VOICE.joinedFor=null; if(/quota|limit|exceed|minutes/i.test(String(e&&e.message))){VOICE.optIn=null;toast('Is mahine ka free voice khatam ho gaya. 1 tareekh ko wapas aayega.','them');voiceBars();return;} if(VOICE.fails<3)netSend({t:'clientLog',where:'voice-connect',msg:String(e&&e.message||e),ua:navigator.userAgent}); if(!VOICE.fails++) toast('Voice chat jud nahi paya. Peeche se try karte rahenge.','them'); setTimeout(voiceSync,Math.min(60000,5000*VOICE.fails)); }
   finally{ VOICE.connecting=false; }
 }
+// Phone locked or app in background for 60s: drop voice; come back and it reconnects.
+document.addEventListener('visibilitychange',()=>{
+  clearTimeout(VOICE.awayTimer);
+  if(document.hidden) VOICE.awayTimer=setTimeout(()=>{VOICE.away=true;voiceSync();},60000);
+  else if(VOICE.away){VOICE.away=false;voiceSync();voiceBars();}
+});
 function voiceLeave(){const r=VOICE.room;VOICE.room=null;VOICE.joinedFor=null;if(r)r.disconnect();$('voiceAudio').innerHTML='';voiceLights([]);}
 /* ---- mic permission: explain first, then ask; help to fix when blocked ---- */
 const MIC={state:'unknown'};   // granted | denied | prompt | unknown
@@ -2443,12 +2493,17 @@ function voiceBars(){ if(VOICE.holding) return; document.querySelectorAll('[data
 function mountVoiceReal(host){
   const V=APP.voice,c=voiceCtx();
   if(!c){host.innerHTML='';return;}
+  if(VOICE.optIn!==c.scope){
+    host.innerHTML=`<div class="voice"><button class="pill on" data-v="join" type="button">🎧 Voice join karo</button><span class="note" style="margin:0">${c.n?`${c.n} log voice pe hain`:'Abhi koi voice pe nahi'}</span></div>`;
+    host.querySelector('[data-v=join]').addEventListener('click',()=>{unlockAudio();VOICE.optIn=c.scope;VOICE.away=false;voiceSync();voiceBars();});
+    return;
+  }
   const watching=!c.talk,r=VOICE.room;
   const status=r?(r.canPlaybackAudio?'':'<button class="pill on" data-v="unlock" type="button">🔈 Awaaz chalu karo</button>'):'<span class="note">Voice jud raha hai…</span>';
   const seg=(k,l)=>`<button type="button" class="${V.mic===k?'on':''}" data-mic="${k}">${l}</button>`;
   const blocked=!watching&&MIC.state==='denied';
   host.innerHTML=`<div class="voice">${watching?'<span class="note" style="margin:0">👀 Sirf sun sakte ho</span>':`<div class="micseg" role="group" aria-label="Mic">${seg('Open','🎙 On')}${seg('Off','🔇 Off')}${seg('PTT','✋ Push to talk')}</div>`}
-    <button class="pill" data-v="spk" type="button" aria-label="Speaker">${V.speaker?'🔈':'🔇'}</button>${status}</div>
+    <button class="pill" data-v="spk" type="button" aria-label="Speaker">${V.speaker?'🔈':'🔇'}</button><button class="pill" data-v="leave" type="button" aria-label="Voice chhodo">Leave</button>${status}</div>
     ${blocked?'<button class="micwarn" data-v="fix" type="button">🎙 Mic blocked hai · Theek karo</button>':''}
     ${!watching&&!blocked&&V.mic==='PTT'?'<button class="ptt-big" data-v="talk" type="button">✋ Dabake bolo</button>':''}`;
   const q=k=>host.querySelector(`[data-v="${k}"]`);
@@ -2463,6 +2518,7 @@ function mountVoiceReal(host){
     up=()=>{if(!VOICE.holding)return;VOICE.holding=false;t.classList.remove('hold');$('youLab').classList.remove('talk');applyMic(false);};
     t.addEventListener('pointerdown',down);t.addEventListener('pointerup',up);t.addEventListener('pointerleave',up);t.addEventListener('pointercancel',up);
     t.addEventListener('contextmenu',e=>e.preventDefault());}
+  q('leave').addEventListener('click',()=>{VOICE.optIn=null;voiceLeave();voiceBars();toast('Voice se nikal gaye');});
   q('spk').addEventListener('click',()=>{unlockAudio();V.speaker=!V.speaker;applyVolumes();voiceBars();toast(V.speaker?'Speaker on':'Speaker off');});
 }
 function voiceMuteToggle(absSeat){

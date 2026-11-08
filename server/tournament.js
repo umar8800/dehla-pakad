@@ -320,7 +320,7 @@ class Tournament {
       matches: this.matches.map(m => ({ ...m })),
       champion: this.champion, claimed: !!me && this.claims.some(c => c.id === me.id),
       claims: host ? this.claims.map(c => ({ name: c.name, email: c.email })) : null,
-      watchers: this.watchers.size, voice: Room.voiceReady,
+      watchers: this.watchers.size, voice: Room.voiceReady, voiceN: Room.voiceCount ? Room.voiceCount('dp-t' + this.code) : 0,
     };
   }
 

@@ -378,7 +378,7 @@ class Room {
   view(i) {
     const g = this.game, now = Date.now();
     return {
-      t: 'state', code: this.code, me: i, host: this.seatOf(this.hostPid), phase: this.phase, voice: Room.voiceReady && this.settings.voice,
+      t: 'state', code: this.code, me: i, host: this.seatOf(this.hostPid), phase: this.phase, voice: Room.voiceReady && this.settings.voice, voiceN: Room.voiceCount ? Room.voiceCount('dp-' + this.code) : 0,
       watchers: [...this.watchers.values()].map(w => w.name),
       match: this.match && { tourCode: this.match.tourCode, stage: this.match.stage, round: this.match.round, readyLeft: this.phase === 'ready' ? Math.max(0, this.readyDeadline - now) : 0 },
       settings: this.settings, teamNames: this.teamNames,

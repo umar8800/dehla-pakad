@@ -114,6 +114,34 @@ async function adminData(days) {
   return { players: players || [], sessions: sessions || [], games: games || [] };
 }
 
+// ---------- usage meter ----------
+const bumpUsage = (d, users, totals) => {
+  if (!enabled) { (mem.usage ||= []).push({ d, users, totals }); return Promise.resolve(true); }
+  return call('rpc/bump_usage', { method: 'POST', body: JSON.stringify({ d, users, totals }) });
+};
+async function usageData() {
+  const now = new Date(), monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
+  const since = new Date(Date.now() - 40 * 86400_000).toISOString().slice(0, 10);
+  if (!enabled) {
+    const daily = new Map(), voice = new Map();
+    for (const { d, users, totals } of mem.usage || []) {
+      const r = daily.get(d) || { day: d, voice_min: 0, mic_min: 0, http_bytes: 0, ws_bytes: 0, peak_voice: 0, codes: 0 };
+      r.voice_min += totals.voice || 0; r.mic_min += totals.mic || 0; r.http_bytes += totals.http || 0; r.ws_bytes += totals.ws || 0; r.peak_voice = Math.max(r.peak_voice, totals.peak || 0); r.codes += totals.codes || 0;
+      daily.set(d, r);
+      for (const u of users) { const v = voice.get(u.pid) || { pid: u.pid, minutes: 0, mic_minutes: 0 }; v.minutes += u.m; v.mic_minutes += u.mic; voice.set(u.pid, v); }
+    }
+    return { daily: [...daily.values()], voice: [...voice.values()], dbBytes: 0 };
+  }
+  const [daily, rows, size] = await Promise.all([
+    call(`usage_daily?day=gte.${since}&order=day.asc`),
+    call(`voice_usage?day=gte.${monthStart}&select=pid,minutes,mic_minutes`),
+    call('rpc/db_size', { method: 'POST', body: '{}' }),
+  ]);
+  const voice = new Map();
+  for (const r of rows || []) { const v = voice.get(r.pid) || { pid: r.pid, minutes: 0, mic_minutes: 0 }; v.minutes += r.minutes; v.mic_minutes += r.mic_minutes; voice.set(r.pid, v); }
+  return { daily: daily || [], voice: [...voice.values()], dbBytes: Number(size) || 0 };
+}
+
 // ---------- friends ----------
 const PCOLS = 'pid,name,icon,fcode';
 async function findByFcode(fc) {
@@ -173,4 +201,4 @@ const COLS = 'pid,name,icon,tw,finals,tours,tables_w,tables_p,games,kot_given,ko
 const allPlayers = async () => (await call(`players?select=${COLS}&username=not.is.null&order=tw.desc,finals.desc,kot_given.desc,kot_taken.asc&limit=2000`)) || [];
 const getPlayer = async pid => ((await call(`players?pid=eq.${encodeURIComponent(pid)}&select=${COLS}`)) || [])[0] || null;
 
-module.exports = { enabled, setPinFails, adminInfo, adminDeviceAdd, adminDeviceCheck, adminDevicesRevoke, sessionStart, sessionsTouch, logGame, isAdmin, adminData, findByUsername, accountOf, createAccount, setIcon, findByFcode, addFriend, removeFriend, friendsOf, playedWith, upsertPlayer, bumpStats, saveSnapshot, deleteSnapshot, loadSnapshots, insertTournament, insertClaim, claimsFor, allPlayers, getPlayer };
+module.exports = { enabled, bumpUsage, usageData, setPinFails, adminInfo, adminDeviceAdd, adminDeviceCheck, adminDevicesRevoke, sessionStart, sessionsTouch, logGame, isAdmin, adminData, findByUsername, accountOf, createAccount, setIcon, findByFcode, addFriend, removeFriend, friendsOf, playedWith, upsertPlayer, bumpStats, saveSnapshot, deleteSnapshot, loadSnapshots, insertTournament, insertClaim, claimsFor, allPlayers, getPlayer };

@@ -38,43 +38,58 @@ const { AccessToken, RoomServiceClient } = require('livekit-server-sdk');
 const LK = { url: process.env.LIVEKIT_URL, key: process.env.LIVEKIT_API_KEY, secret: process.env.LIVEKIT_API_SECRET };
 const LKT = () => ({ url: LK.url.trim(), key: LK.key.trim(), secret: LK.secret.trim() });   // tolerate stray spaces/newlines
 Room.voiceReady = !!(LK.url && LK.key && LK.secret);
+Room.voiceCount = name => (typeof voiceNow !== 'undefined' && voiceNow.get(name)) || 0;
 const LK_CLIENT = path.join(__dirname, '..', 'node_modules', 'livekit-client', 'dist', 'livekit-client.umd.js');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, '..', 'public');
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 
 const rooms = new Map();   // code -> Room (friends tables and tournament matches)
 const tours = new Map();   // code -> Tournament
 const clients = new Set();
 const online = new Map();  // pid -> client (latest connection)
 
+// ---- static files: kept in memory, gzipped, with ETags so repeat visits cost almost nothing ----
+const zlib = require('zlib');
+const fileCache = new Map();   // key -> { body, gz, etag, type }
+function cached(key, load, type) {
+  let c = fileCache.get(key);
+  if (!c || process.env.NODE_ENV !== 'production') {
+    const body = load();
+    c = { body, gz: zlib.gzipSync(body, { level: 9 }), etag: '"' + crypto.createHash('sha1').update(body).digest('hex').slice(0, 16) + '"', type };
+    fileCache.set(key, c);
+  }
+  return c;
+}
+const USAGE = { http: 0, ws: 0, voice: 0, mic: 0, peak: 0, codes: 0, users: new Map() };   // flushed to the database every minute
+function serve(req, res, c, cacheControl) {
+  const head = { 'content-type': c.type, 'cache-control': cacheControl, etag: c.etag, vary: 'accept-encoding' };
+  if (req.headers['if-none-match'] === c.etag) { res.writeHead(304, head); return res.end(); }
+  const gz = /\bgzip\b/.test(req.headers['accept-encoding'] || '') && !c.type.startsWith('image/');
+  const body = gz ? c.gz : c.body;
+  if (gz) head['content-encoding'] = 'gzip';
+  head['content-length'] = body.length;
+  USAGE.http += body.length;
+  res.writeHead(200, head); res.end(body);
+}
+const HOSTS = new Set(['dehlapakad.com', 'www.dehlapakad.com', 'dehla-pakad-z5re.onrender.com']);
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   if (url.pathname === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end(`ok ${rooms.size} tables · ${tours.size} tournaments · voice ${Room.voiceReady ? 'on' : 'off'} · db ${db.enabled ? 'on' : 'off'}`); }
-  if (url.pathname === '/vendor/livekit-client.js') {
-    res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'public, max-age=86400' });
-    return fs.createReadStream(LK_CLIENT).pipe(res);
-  }
+  if (url.pathname === '/vendor/livekit-client.js') return serve(req, res, cached('lk', () => fs.readFileSync(LK_CLIENT), 'text/javascript'), 'public, max-age=604800');
   let file = path.normalize(path.join(PUBLIC, decodeURIComponent(url.pathname)));
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
   if (url.pathname === '/' || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(PUBLIC, 'index.html');
   const ext = path.extname(file);
   if (file.endsWith('index.html')) {               // fill in the site address for WhatsApp link previews
-    const proto = req.headers['x-forwarded-proto'] || 'http';
-    res.writeHead(200, { 'content-type': TYPES['.html'], 'cache-control': 'no-cache' });
-    return res.end(INDEX().replace(/%ORIGIN%/g, `${proto}://${req.headers.host}`));
+    const host = HOSTS.has(String(req.headers.host)) ? req.headers.host : 'dehlapakad.com';
+    return serve(req, res, cached('index:' + host, () => Buffer.from(fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8').replace(/%ORIGIN%/g, `https://${host}`)), TYPES['.html']), 'no-cache');
   }
-  res.writeHead(200, {
-    'content-type': TYPES[ext] || 'application/octet-stream',
-    'cache-control': ext === '.html' || file.endsWith('sw.js') ? 'no-cache' : 'public, max-age=3600',
-  });
-  fs.createReadStream(file).pipe(res);
+  serve(req, res, cached(file, () => fs.readFileSync(file), TYPES[ext] || 'application/octet-stream'), file.endsWith('sw.js') ? 'no-cache' : 'public, max-age=86400');
 });
 
-let indexCache = null;
-const INDEX = () => (process.env.NODE_ENV === 'production' && indexCache) || (indexCache = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8'));
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024, perMessageDeflate: { threshold: 512, zlibDeflateOptions: { level: 6 } } });
 
 function newCode() {
   for (let i = 0; i < 80; i++) {
@@ -306,6 +321,15 @@ wss.on('connection', (ws, req) => {
         if (tour) tour.leave(client.pid);
         client.tour = null;
         return send({ t: 'tourLeft' });
+      case 'adminUsage':
+        db.adminInfo(client.pid).then(async info => {
+          if (!info || !client.adminOk) return err('Ye sirf admin ke liye hai');
+          const u = await db.usageData();
+          const id = pid => pid ? fcode(pid) : null;
+          send({ t: 'adminUsage', now: new Date().toISOString(), voiceNow: [...voiceNow.values()].reduce((a, b) => a + b, 0),
+            daily: u.daily, voice: u.voice.map(({ pid, ...x }) => ({ ...x, id: id(pid) })), dbBytes: u.dbBytes, emailOn: !!RESEND_KEY });
+        }).catch(e => { console.error('adminUsage', e.message); err('Server error'); });
+        return;
       case 'adminCode':                                 // email a one-time code / check it
         db.adminInfo(client.pid).then(async info => {
           if (!info) return err('Ye sirf admin ke liye hai');
@@ -314,7 +338,7 @@ wss.on('connection', (ws, req) => {
             if (!limit(fails, 'code:' + client.pid, 3, 15 * 60_000)) return send({ t: 'adminAuth', need: true, email: maskEmail(info.admin_email), canEmail: true, error: 'Bahut codes bhej diye. 15 minute baad try karo.' });
             const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
             adminCodes.set(client.pid, { hash: sha(code), exp: Date.now() + 10 * 60_000, tries: 0 });
-            try { await sendAdminEmail(info.admin_email, code); send({ t: 'adminAuth', need: true, sent: true, email: maskEmail(info.admin_email), canEmail: true }); }
+            try { await sendAdminEmail(info.admin_email, code); USAGE.codes++; send({ t: 'adminAuth', need: true, sent: true, email: maskEmail(info.admin_email), canEmail: true }); }
             catch (e) { console.error('admin email', e.message); send({ t: 'adminAuth', need: true, email: maskEmail(info.admin_email), canEmail: true, error: 'Email nahi gaya. Thodi der baad try karo.' }); }
             return;
           }
@@ -411,6 +435,56 @@ setInterval(() => {
     ws.isAlive = false; ws.ping();
   }
 }, 25_000);
+
+// ---- usage meter: voice minutes straight from LiveKit, bandwidth from the sockets ----
+const lkSvc = Room.voiceReady ? new RoomServiceClient(LKT().url.replace(/^ws/, 'http'), LKT().key, LKT().secret) : null;
+const voiceNow = new Map();   // LiveKit room name -> people connected
+function voicePid(roomName, identity) {
+  const byPrefix = pfx => { for (const c of clients) if (c.pid && c.pid.startsWith(pfx)) return c.pid; return null; };
+  if (roomName.startsWith('dp-t')) {
+    const t = tours.get(roomName.slice(4));
+    if (identity.startsWith('tp-')) { const p = t && t.players.find(x => String(x.id) === identity.slice(3)); return p ? p.pid : null; }
+    return identity.startsWith('twatch-') ? byPrefix(identity.slice(7)) : null;
+  }
+  const r = rooms.get(roomName.slice(3));
+  if (identity.startsWith('seat-')) { const s = r && r.seats[+identity.slice(5)]; return s && !s.bot ? s.pid : null; }
+  return identity.startsWith('watch-') ? byPrefix(identity.slice(6)) : null;
+}
+async function meterVoice() {
+  if (!lkSvc) return;
+  try {
+    const list = await lkSvc.listRooms();
+    let total = 0; voiceNow.clear();
+    for (const room of list) {
+      const ps = await lkSvc.listParticipants(room.name);
+      voiceNow.set(room.name, ps.length); total += ps.length;
+      for (const p of ps) {
+        const mic = (p.tracks || []).some(t => (t.type === 0 || t.type === 'AUDIO') && !t.muted) ? 1 : 0;
+        USAGE.voice++; USAGE.mic += mic;
+        const pid = voicePid(room.name, p.identity);
+        if (pid) { const u = USAGE.users.get(pid) || { m: 0, mic: 0 }; u.m++; u.mic += mic; USAGE.users.set(pid, u); }
+      }
+    }
+    USAGE.peak = Math.max(USAGE.peak, total);
+  } catch (e) { console.error('voice meter', e.message); }
+}
+let wsBytesSeen = new WeakMap();
+function meterSockets() {
+  for (const ws of wss.clients) {
+    const sock = ws._socket; if (!sock) continue;
+    const prev = wsBytesSeen.get(sock) || 0, now = sock.bytesWritten || 0;
+    USAGE.ws += Math.max(0, now - prev); wsBytesSeen.set(sock, now);
+  }
+}
+async function flushUsage() {
+  meterSockets();
+  const day = new Date().toISOString().slice(0, 10);
+  const users = [...USAGE.users].map(([pid, u]) => ({ pid, ...u }));
+  const totals = { voice: USAGE.voice, mic: USAGE.mic, http: USAGE.http, ws: USAGE.ws, peak: USAGE.peak, codes: USAGE.codes };
+  Object.assign(USAGE, { http: 0, ws: 0, voice: 0, mic: 0, peak: 0, codes: 0 }); USAGE.users = new Map();
+  if (Object.values(totals).some(Boolean)) await db.bumpUsage(day, users, totals);
+}
+setInterval(() => { meterVoice().then(flushUsage).catch(e => console.error('usage', e.message)); }, Number(process.env.USAGE_MS) || 60_000);
 
 // Keep open sessions' "last seen" fresh, so a server restart still leaves an accurate end time.
 setInterval(() => db.sessionsTouch([...clients].map(c => c.sessionId).filter(Boolean)), 60_000);
