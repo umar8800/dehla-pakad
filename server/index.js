@@ -137,7 +137,13 @@ wss.on('connection', ws => {
     if (acct && acct.username) { client.name = acct.name; if (acct.icon && !m.icon) client.icon = acct.icon; }
     online.set(client.pid, client);
     if (acct && acct.username) db.setIcon(client.pid, client.icon); else db.upsertPlayer(client.pid, client.name, client.icon, fcode(client.pid));
-    send({ t: 'me', name: client.name, username: acct ? acct.username : null });
+    const admin = await db.isAdmin(client.pid);
+    send({ t: 'me', name: client.name, username: acct ? acct.username : null, admin });
+    if (!client.sessionId) {
+      const ua = String(m.ua || '');
+      const device = /iPhone|iPad/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Other';
+      client.sessionId = await db.sessionStart(client.pid, device + (m.standalone ? ' · app' : ' · browser'));
+    }
     // Rejoin the tournament and/or table this player was already part of.
       for (const t of tours.values()) if (t.byPid(client.pid)) { client.tour = t; t.join(client); break; }
       for (const r of rooms.values()) if (r.seatOf(client.pid) >= 0 && !(r.match && r.phase === 'final')) { client.room = r; r.join(client); return; }
@@ -272,6 +278,23 @@ wss.on('connection', ws => {
         if (tour) tour.leave(client.pid);
         client.tour = null;
         return send({ t: 'tourLeft' });
+      case 'admin':                                     // owner-only dashboard data
+        db.isAdmin(client.pid).then(async ok => {
+          if (!ok) return err('Ye sirf admin ke liye hai');
+          const days = Math.min(90, Math.max(1, Number(m.days) || 30));
+          const d = await db.adminData(days);
+          const live = [...clients].filter(c => c.pid).map(c => ({ pid: c.pid, where: c.room ? (c.room.match ? 'Tournament match' : 'Table') + ' DP-' + c.room.code + ' · ' + c.room.phase : c.tour ? 'Tournament DP-' + c.tour.code + ' · ' + c.tour.phase : 'Home' }));
+          const uniq = new Map(); live.forEach(l => uniq.set(l.pid, l));
+          // never send private login ids, only public friend codes
+          const id = pid => pid ? fcode(pid) : null;
+          d.players = d.players.map(({ pid, friends, ...p }) => ({ ...p, id: id(pid), friends: (friends || []).map(id), icon: rankIcon(p.icon) }));
+          d.sessions = d.sessions.map(({ pid, ...x }) => ({ ...x, id: id(pid) }));
+          d.games = d.games.map(g => ({ ...g, players: (g.players || []).map(({ pid, ...x }) => ({ ...x, id: id(pid) })) }));
+          send({ t: 'adminData', days, now: new Date().toISOString(), live: [...uniq.values()].map(l => ({ id: id(l.pid), where: l.where })), ...d,
+            rooms: [...rooms.values()].map(r => ({ code: r.code, phase: r.phase, match: !!r.match, seats: r.seats.map(s => s && { name: s.name, bot: !!s.bot, on: !!s.connected }), watchers: r.watchers.size })),
+            tours: [...tours.values()].map(t => ({ code: t.code, phase: t.phase, players: t.players.length })) });
+        });
+        return;
       case 'clientLog':                                 // errors from phones (voice etc.) for debugging
         console.log(`client[${client.name}] ${String(m.where || '').slice(0, 20)}: ${String(m.msg || '').slice(0, 300)} · ${String(m.ua || '').slice(0, 120)}`);
         return;
@@ -316,6 +339,7 @@ wss.on('connection', ws => {
 
   ws.on('close', () => {
     clients.delete(client);
+    if (client.sessionId) db.sessionsTouch([client.sessionId]);
     if (client.pid && online.get(client.pid) === client) online.delete(client.pid);
     if (client.room && client.pid) client.room.disconnect(client.pid);
     if (client.tour && client.pid) client.tour.disconnect(client.pid);
@@ -329,6 +353,9 @@ setInterval(() => {
     ws.isAlive = false; ws.ping();
   }
 }, 25_000);
+
+// Keep open sessions' "last seen" fresh, so a server restart still leaves an accurate end time.
+setInterval(() => db.sessionsTouch([...clients].map(c => c.sessionId).filter(Boolean)), 60_000);
 
 // Start matches whose teams have become free.
 setInterval(() => { for (const t of tours.values()) t.tick(); }, 3_000);

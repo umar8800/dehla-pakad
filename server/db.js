@@ -21,7 +21,7 @@ async function call(path, opts = {}) {
 }
 
 // Without a database (local testing) players and friends live in memory.
-const mem = { players: new Map(), links: new Set(), played: new Map() };
+const mem = { players: new Map(), links: new Set(), played: new Map(), sessions: [], games: [] };
 
 const upsertPlayer = (pid, name, icon, fcode) => {
   const ic = icon && icon.length > 60_000 ? null : icon;
@@ -61,6 +61,32 @@ const setIcon = (pid, icon) => {
   if (!enabled) { const p = mem.players.get(pid); if (p) p.icon = ic; return Promise.resolve(true); }
   return call(`players?pid=eq.${encodeURIComponent(pid)}`, { method: 'PATCH', headers: { prefer: 'return=minimal' }, body: JSON.stringify({ icon: ic, updated_at: new Date().toISOString() }) });
 };
+
+// ---------- activity tracking (admin only) ----------
+async function sessionStart(pid, device) {
+  if (!enabled) { const now = new Date().toISOString(); mem.sessions.unshift({ id: mem.sessions.length + 1, pid, device, started_at: now, last_at: now }); return mem.sessions.length; }
+  const r = await call('sessions?select=id', { method: 'POST', headers: { prefer: 'return=representation' }, body: JSON.stringify({ pid, device }) });
+  return r && r[0] ? r[0].id : null;
+}
+const sessionsTouch = ids => !enabled ? mem.sessions.forEach(x => { if (ids.includes(x.id)) x.last_at = new Date().toISOString(); }) : ids.length ? call(`sessions?id=in.(${ids.map(Number).join(',')})`, { method: 'PATCH', headers: { prefer: 'return=minimal' }, body: JSON.stringify({ last_at: new Date().toISOString() }) }) : null;
+const logGame = rec => enabled ? call('games', { method: 'POST', headers: { prefer: 'return=minimal' }, body: JSON.stringify(rec) }) : mem.games.unshift({ ...rec, ended_at: new Date().toISOString() });
+async function isAdmin(pid) {
+  if (!enabled) { const p = mem.players.get(pid); return !!(p && process.env.TEST_ADMIN && p.username === process.env.TEST_ADMIN); }   // local tests only
+  const r = await call(`players?pid=eq.${encodeURIComponent(pid)}&select=is_admin`);
+  return !!(r && r[0] && r[0].is_admin);
+}
+async function adminData(days) {
+  if (!enabled) return {
+    players: [...mem.players.values()].filter(p => p.username).map(p => ({ games: 0, tables_p: 0, tables_w: 0, tours: 0, tw: 0, finals: 0, kot_given: 0, kot_taken: 0, dehle: 0, friends: [...(mem.played.get(p.pid) || [])], created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...p })),
+    sessions: mem.sessions.map(({ id, ...x }) => x), games: mem.games };
+  const since = new Date(Date.now() - days * 86400_000).toISOString();
+  const [players, sessions, games] = await Promise.all([
+    call('players?username=not.is.null&select=pid,username,name,icon,created_at,updated_at,games,tables_p,tables_w,tours,tw,finals,kot_given,kot_taken,dehle,friends&order=created_at.asc&limit=5000'),
+    call(`sessions?started_at=gte.${since}&select=pid,started_at,last_at,device&order=started_at.desc&limit=20000`),
+    call(`games?ended_at=gte.${since}&select=code,kind,started_at,ended_at,players,result&order=ended_at.desc&limit=20000`),
+  ]);
+  return { players: players || [], sessions: sessions || [], games: games || [] };
+}
 
 // ---------- friends ----------
 const PCOLS = 'pid,name,icon,fcode';
@@ -121,4 +147,4 @@ const COLS = 'pid,name,icon,tw,finals,tours,tables_w,tables_p,games,kot_given,ko
 const allPlayers = async () => (await call(`players?select=${COLS}&username=not.is.null&order=tw.desc,finals.desc,kot_given.desc,kot_taken.asc&limit=2000`)) || [];
 const getPlayer = async pid => ((await call(`players?pid=eq.${encodeURIComponent(pid)}&select=${COLS}`)) || [])[0] || null;
 
-module.exports = { enabled, findByUsername, accountOf, createAccount, setIcon, findByFcode, addFriend, removeFriend, friendsOf, playedWith, upsertPlayer, bumpStats, saveSnapshot, deleteSnapshot, loadSnapshots, insertTournament, insertClaim, claimsFor, allPlayers, getPlayer };
+module.exports = { enabled, sessionStart, sessionsTouch, logGame, isAdmin, adminData, findByUsername, accountOf, createAccount, setIcon, findByFcode, addFriend, removeFriend, friendsOf, playedWith, upsertPlayer, bumpStats, saveSnapshot, deleteSnapshot, loadSnapshots, insertTournament, insertClaim, claimsFor, allPlayers, getPlayer };

@@ -137,6 +137,18 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .about{text-align:center;padding:16px 8px 4px;border-top:1px solid var(--line);margin-top:6px}
 .about .logo.sm{font-size:20px;margin-bottom:6px}
 .about p{margin:4px 0;font-size:13.5px}.about p.muted{font-size:12px}
+.adkpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}.adkpis.sm{grid-template-columns:1fr 1fr 1fr;margin:12px 0}
+.adkpis>div{background:rgba(246,238,226,.05);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}
+.adkpis b{font-size:22px;font-weight:800;line-height:1.1}.adkpis.sm b{font-size:17px}.adkpis span{font-size:12px;color:var(--muted)}.adkpis small{font-size:11px;color:var(--muted)}
+.adchart{width:100%;height:110px;display:block}.adaxis{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px}
+.adfun{display:grid;grid-template-columns:150px 1fr 34px;align-items:center;gap:8px;padding:4px 0;font-size:13px}.adfun div{height:10px;background:rgba(246,238,226,.08);border-radius:6px;overflow:hidden}.adfun i{display:block;height:100%;background:var(--brass);border-radius:6px}.adfun b{text-align:right}
+.adlist{padding:4px 12px}.adu{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;border-top:1px solid var(--line);padding:10px 0;color:inherit;text-align:left;font:inherit}.adu:first-child{border-top:none}
+.adu .ic{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:20px;background:rgba(246,238,226,.07);position:relative;flex:none}.adu .ic i{position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;background:#62d3b1;border:2px solid #1a1225}
+.adu .nm{flex:1;min-width:0}.adu .nm b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.adu .nm small{font-size:11.5px;color:var(--muted)}
+.adnums{display:flex;gap:8px;flex:none}.adnums span{display:flex;flex-direction:column;align-items:center;font-size:10.5px;color:var(--muted);min-width:34px}.adnums b{font-size:14px;color:var(--ink)}
+.adg{border-top:1px solid var(--line);padding:10px 0}.adg:first-child{border-top:none}.adg small{color:var(--muted);font-size:11.5px}
+.adteams{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;font-size:12.5px;margin-top:4px}.adteams>b{font-size:16px}.adteams span:last-child{text-align:right}
+.kotnote{display:block;margin-top:3px;color:#ff9aa6!important}
 .lteams{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.lteams>*{min-width:0}
 .lteam{border:1px solid var(--line);border-radius:14px;padding:10px;background:rgba(0,0,0,.2)}
 .lteam.mine{border-color:var(--us)}
@@ -653,6 +665,10 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
   <div class="pagehead"><h2>Dost</h2><small>Dost banao, unhe table pe bulao</small></div>
   <div class="stack-v" id="frBody"></div>
 </section>
+<section class="screen" id="scr-admin" hidden>
+  <div class="pagehead row" style="align-items:center"><div><h2>Admin</h2><small>Sirf tumhe dikhta hai</small></div><button class="pill" id="adBack" type="button">‹ Wapas</button></div>
+  <div class="stack-v" id="adBody"></div>
+</section>
 <section class="screen" id="scr-rank" hidden>
   <div class="pagehead"><h2>Ranking</h2><small>Tournament wins se ranking</small></div>
   <div class="stack-v" id="rkBody"></div>
@@ -924,6 +940,7 @@ function renderMe(){
   <div class="panel menu" style="margin:0"><div class="row"><div><b>Doosre phone pe khelna hai?</b><small>Wahan "Pehle khel chuke ho?" pe username + PIN daalo</small></div></div></div>
   <div class="panel menu" style="margin:0"><div class="row"><div><b>Tips dobara dikhao</b><small>Pehli baar wale chhote hints</small></div><button class="pill" id="meTips" type="button">Dikhao</button></div></div>
   <div class="panel menu" style="margin:0"><div class="row"><div><b>Bots ki speed</b><small>Offline aur test games mein</small></div><button class="pill" id="meSpeed" type="button">${APP.speed}</button></div></div>
+  ${APP.admin?'<button class="cta" id="meAdmin" type="button">📊 Admin dashboard</button>':''}
   <button class="cta ghost" id="meLogout" type="button">Logout</button>
   ${ABOUT_HTML}`;
   }
@@ -956,6 +973,7 @@ function renderMe(){
     if(ME.user&&ME.mode!=='login'&&/^[A-Za-z0-9_]{3,14}$/.test(ME.user))netSend({t:'checkName',username:ME.user});
     return;
   }
+  const ma=$('meAdmin');if(ma)ma.addEventListener('click',openAdmin);
   $('meTips').addEventListener('click',()=>{TIPS.reset();toast('Tips wapas aa gaye. Home pe chalo.');goHome();});
   $('meLogout').addEventListener('click',()=>openSheet(`<h2>Logout karein?</h2><p>Is phone se account hat jayega. Wapas aane ke liye username + PIN chahiye hoga.</p><button class="cta" data-act="out" type="button">Haan, logout</button><button class="cta ghost" data-act="close" type="button">Nahi</button>`,{out:()=>{
     ['dp-acct','dp-pid','dp-profile'].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});location.reload();}}));
@@ -971,13 +989,128 @@ const ABOUT_HTML=`<div class="about"><div class="logo sm">Dehla<b>Pakad</b></div
   <p>Designed &amp; developed by <b>Umar Farooq Khan</b></p>
   <p class="muted">Ghar ke Mindi Coat rules, dosto aur family ke saath. Version ${APP_VERSION}</p></div>`;
 function aboutSheet(){openSheet(`${ABOUT_HTML}<p class="muted" style="font-size:13px;text-align:center;margin:12px 0 0">Har Kot, har dehla, aur har "ek aur" ke liye shukriya. 🃏</p><button class="cta ghost" data-act="close" type="button" style="margin-top:14px">Band karo</button>`);}
+/* ================= admin dashboard (owner only; server checks too) ================= */
+const ADMIN={days:7,data:null,tab:'overview',sort:'last',opened:false};
+const UK=d=>new Date(d).toLocaleString('en-GB',{timeZone:'Europe/London',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+const UKday=d=>new Date(d).toLocaleDateString('en-GB',{timeZone:'Europe/London',day:'numeric',month:'short'});
+const ago=d=>{if(!d)return '—';const m=(Date.now()-new Date(d))/60000;if(m<2)return 'abhi';if(m<60)return Math.round(m)+' min pehle';if(m<1440)return Math.round(m/60)+' ghante pehle';return Math.round(m/1440)+' din pehle';};
+const dur=sec=>{sec=Math.round(sec);if(sec<60)return sec+'s';const m=Math.round(sec/60);if(m<60)return m+' min';return Math.floor(m/60)+'h '+(m%60)+'m';};
+function openAdmin(){if(!APP.admin){toast('Ye sirf admin ke liye hai','them');return;}stopSim();clearTimer();G.token++;show('scr-admin');$('adBody').innerHTML='<div class="panel"><p class="muted" style="margin:0">Data aa raha hai…</p></div>';netSend({t:'admin',days:ADMIN.days});}
+function onAdmin(m){ADMIN.data=m;if(!$('scr-admin').hidden)renderAdmin();}
+function adminModel(){
+  const D=ADMIN.data,P=new Map();
+  D.players.forEach(p=>P.set(p.id,{...p,sess:[],glist:[],co:new Map(),secs:0}));
+  D.sessions.forEach(x=>{const u=P.get(x.id);if(!u)return;const sec=Math.max(0,(new Date(x.last_at)-new Date(x.started_at))/1000);x.sec=sec;u.sess.push(x);u.secs+=sec;});
+  const human=D.games.filter(g=>g.players.filter(x=>!x.bot).length>=1);
+  human.forEach(g=>{g.sec=g.started_at?Math.max(0,(new Date(g.ended_at)-new Date(g.started_at))/1000):0;
+    const hs=g.players.filter(x=>!x.bot&&x.id);
+    hs.forEach(x=>{const u=P.get(x.id);if(!u)return;u.glist.push(g);hs.forEach(y=>{if(y.id!==x.id)u.co.set(y.id,(u.co.get(y.id)||0)+1);});});});
+  const live=new Map(D.live.map(l=>[l.id,l.where]));
+  const users=[...P.values()].map(u=>({...u,
+    last:live.has(u.id)?D.now:(u.sess[0]?u.sess[0].last_at:u.updated_at),
+    online:live.has(u.id),where:live.get(u.id),
+    avg:u.sess.length?u.secs/u.sess.length:0,
+    device:(u.sess[0]||{}).device||'—'}));
+  users.forEach(u=>{u.games=Math.max(u.games||0,u.glist.length);P.set(u.id,u);});
+  return {D,users,human,P};
+}
+function bars(vals,labels,color,h=90){
+  const max=Math.max(1,...vals),w=100/vals.length;
+  return `<svg viewBox="0 0 100 ${h+14}" preserveAspectRatio="none" class="adchart" role="img">${vals.map((v,i)=>{const bh=v/max*h;return `<rect x="${i*w+w*.15}" y="${h-bh}" width="${w*.7}" height="${Math.max(bh,v?1.5:0)}" rx="1" fill="${color}"><title>${labels[i]}: ${v}</title></rect>`;}).join('')}</svg>
+  <div class="adaxis"><span>${labels[0]}</span><span>max ${max}</span><span>${labels[labels.length-1]}</span></div>`;
+}
+function renderAdmin(){
+  const {D,users,human,P}=adminModel(),days=ADMIN.days,since=Date.now()-days*86400000;
+  const nm=id=>{const u=P.get(id);return u?esc(u.name):'?';};
+  const active=users.filter(u=>u.sess.length||u.online),newU=users.filter(u=>new Date(u.created_at)>since);
+  const realGames=human.filter(g=>g.players.filter(x=>!x.bot).length>=2),allSess=D.sessions;
+  const totSec=allSess.reduce((a,x)=>a+(x.sec||0),0),avgSess=allSess.length?totSec/allSess.length:0;
+    // daily series (UK days)
+  const nDays=Math.min(days,30),keys=[],labels=[];
+  for(let i=nDays-1;i>=0;i--){const d=new Date(Date.now()-i*86400000);keys.push(d.toLocaleDateString('en-CA',{timeZone:'Europe/London'}));labels.push(UKday(d));}
+  const dk=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Europe/London'});
+  const actDay=keys.map(k=>new Set(allSess.filter(x=>dk(x.started_at)===k).map(x=>x.id)).size);
+  const gameDay=keys.map(k=>human.filter(g=>dk(g.ended_at)===k).length);
+  const hours=Array(24).fill(0);allSess.forEach(x=>{hours[+new Date(x.started_at).toLocaleString('en-GB',{timeZone:'Europe/London',hour:'2-digit',hour12:false})%24]++;});
+  // funnel
+  const f1=users.length,f2=users.filter(u=>u.sess.length>=2||u.games>0).length,f3=users.filter(u=>u.games>0).length,f4=users.filter(u=>u.games>=5).length;
+  const fun=[['Signed up',f1],['Wapas aaye (2+ visits)',f2],['1+ game khela',f3],['5+ games',f4]];
+  const devices={};allSess.forEach(x=>{const k=(x.device||'—').split(' · ')[0];devices[k]=(devices[k]||0)+1;});
+  const tabs=[['overview','Overview'],['players','Players'],['games','Games'],['live','Live']];
+  let body='';
+  if(ADMIN.tab==='overview'){
+    body=`<div class="adkpis">
+      <div><b>${users.length}</b><span>Total players</span></div>
+      <div><b>${active.length}</b><span>Active · ${days}d</span></div>
+      <div><b>${newU.length}</b><span>Naye · ${days}d</span></div>
+      <div><b>${D.live.length}</b><span>Online abhi</span></div>
+      <div><b>${human.length}</b><span>Games · ${days}d</span><small>${realGames.length} with 2+ log</small></div>
+      <div><b>${dur(avgSess)}</b><span>Avg session</span></div>
+      <div><b>${dur(totSec)}</b><span>Total play time</span></div>
+      <div><b>${allSess.length}</b><span>Visits · ${days}d</span></div></div>
+    <div class="panel"><p class="lab">Roz ke active players</p>${bars(actDay,labels,'#62d3b1')}</div>
+    <div class="panel"><p class="lab">Roz ke games</p>${bars(gameDay,labels,'#f2b33f')}</div>
+    <div class="panel"><p class="lab">Log kab khelte hain (UK time, visits)</p>${bars(hours,hours.map((_,i)=>i+':00'),'#9b8cff',70)}</div>
+    <div class="panel"><p class="lab">Funnel · sab players, all time</p>${fun.map(([l,v])=>`<div class="adfun"><span>${l}</span><div><i style="width:${f1?v/f1*100:0}%"></i></div><b>${v}</b></div>`).join('')}
+      <p class="fieldnote" style="margin-top:8px">${f1-f3} players ne signup kiya par abhi tak ek bhi game nahi khela.</p></div>
+    <div class="panel"><p class="lab">Device (visits)</p>${Object.entries(devices).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="row" style="padding:4px 0"><span>${esc(k)}</span><b>${v}</b></div>`).join('')||'<p class="muted" style="margin:0">Abhi data nahi</p>'}</div>`;
+  }
+  if(ADMIN.tab==='players'){
+    const sorts={last:(a,b)=>new Date(b.last||0)-new Date(a.last||0),games:(a,b)=>b.games-a.games,time:(a,b)=>b.secs-a.secs,visits:(a,b)=>b.sess.length-a.sess.length,joined:(a,b)=>new Date(b.created_at)-new Date(a.created_at)};
+    const list=[...users].sort(sorts[ADMIN.sort]);
+    body=`<div class="chiprow">${[['last','Last online'],['games','Games'],['time','Play time'],['visits','Visits'],['joined','Naye']].map(([k,l])=>`<button class="pill sm ${ADMIN.sort===k?'on':''}" data-sort="${k}" type="button">${l}</button>`).join('')}</div>
+    <div class="panel adlist">${list.map(u=>`<button class="adu" type="button" data-u="${u.id}"><span class="ic">${av(u.icon)}${u.online?'<i></i>':''}</span>
+      <div class="nm"><b>${esc(u.name)}</b><small>${u.online?'🟢 '+esc(u.where):ago(u.last)} · joined ${UKday(u.created_at)}</small></div>
+      <div class="adnums"><span><b>${u.games}</b>games</span><span><b>${u.sess.length}</b>visits</span><span><b>${dur(u.avg)}</b>avg</span></div></button>`).join('')}</div>
+    <p class="fieldnote">Visits, time aur avg pichhle ${days} din ke hain. Games all-time hain. Tracking 8 Nov 2026 se shuru hui.</p>`;
+  }
+  if(ADMIN.tab==='games'){
+    body=`<div class="panel adlist">${human.slice(0,150).map(g=>{const r=g.result||{},tn=r.teamNames||['A','B'];const t0=g.players.filter(x=>x.team===0),t1=g.players.filter(x=>x.team===1);
+      const who=a=>a.map(x=>x.bot?`<span class="muted">🤖${esc(x.name)}</span>`:esc(x.name)).join(', ');
+      return `<div class="adg"><div class="row"><b>${g.kind==='table'?'Table':g.kind==='tournament'?'🏆 Tournament':'Practice'} · DP-${esc(g.code)}</b><small>${UK(g.ended_at)}${g.sec?' · '+dur(g.sec):''}</small></div>
+      <div class="adteams"><span>${esc(tn[0]||'A')}: ${who(t0)}</span><b>${r.a}–${r.b}</b><span>${esc(tn[1]||'B')}: ${who(t1)}</span></div>
+      ${r.kotTo!=null?`<small class="kotnote">Kot: ${esc(tn[r.kotTo]||'')}</small>`:''}</div>`;}).join('')||'<p class="muted" style="margin:0">Is range mein koi game nahi.</p>'}</div>`;
+  }
+  if(ADMIN.tab==='live'){
+    body=`<div class="panel"><p class="lab">Online abhi (${D.live.length})</p>${D.live.map(l=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><b>${nm(l.id)}</b><small>${esc(l.where)}</small></div>`).join('')||'<p class="muted" style="margin:0">Koi online nahi.</p>'}</div>
+    <div class="panel"><p class="lab">Chal rahi tables (${D.rooms.length})</p>${D.rooms.map(r=>`<div style="padding:6px 0;border-top:1px solid var(--line)"><div class="row"><b>DP-${esc(r.code)}${r.match?' · match':''}</b><small>${esc(r.phase)}${r.watchers?' · 👀 '+r.watchers:''}</small></div><small class="muted">${r.seats.map(x=>x?(x.bot?'🤖':x.on?'🟢':'⚪')+esc(x.name):'—').join(' · ')}</small></div>`).join('')||'<p class="muted" style="margin:0">Koi table nahi.</p>'}</div>
+    <div class="panel"><p class="lab">Tournaments (${D.tours.length})</p>${D.tours.map(t=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><b>DP-${esc(t.code)}</b><small>${esc(t.phase)} · ${t.players} players</small></div>`).join('')||'<p class="muted" style="margin:0">Koi tournament nahi.</p>'}</div>`;
+  }
+  $('adBody').innerHTML=`<div class="chiprow">${[1,7,30,90].map(d=>`<button class="pill sm ${days===d?'on':''}" data-days="${d}" type="button">${d===1?'Aaj':d+' din'}</button>`).join('')}<button class="pill sm" id="adRefresh" type="button">↻</button></div>
+    <div class="segtabs">${tabs.map(([k,l])=>`<button type="button" class="${ADMIN.tab===k?'on':''}" data-atab="${k}">${l}</button>`).join('')}</div>${body}
+    <p class="fieldnote">Updated ${UK(D.now)} · Offline (bots) games phone pe hi chalte hain, unka data yahan nahi aata.</p>`;
+  const b=$('adBody');
+  b.querySelectorAll('[data-days]').forEach(x=>x.addEventListener('click',()=>{ADMIN.days=+x.dataset.days;netSend({t:'admin',days:ADMIN.days});x.textContent='…';}));
+  $('adRefresh').addEventListener('click',()=>netSend({t:'admin',days:ADMIN.days}));
+  b.querySelectorAll('[data-atab]').forEach(x=>x.addEventListener('click',()=>{ADMIN.tab=x.dataset.atab;renderAdmin();}));
+  b.querySelectorAll('[data-sort]').forEach(x=>x.addEventListener('click',()=>{ADMIN.sort=x.dataset.sort;renderAdmin();}));
+  b.querySelectorAll('[data-u]').forEach(x=>x.addEventListener('click',()=>adminUser(P.get(x.dataset.u),P)));
+}
+function adminUser(u,P){
+  if(!u)return;
+  const co=[...u.co.entries()].sort((a,b)=>b[1]-a[1]),nm=id=>{const x=P.get(id);return x?esc(x.name):'?';};
+  const allCo=(u.friends||[]).length;
+  openSheet(`<div class="row" style="gap:12px;justify-content:flex-start"><span class="bigav" style="width:56px;height:56px;font-size:28px">${av(u.icon)}</span><div><h2 style="margin:0">${esc(u.name)}</h2><small class="muted">@${esc(u.username)} · joined ${UK(u.created_at)}</small></div></div>
+    <div class="adkpis sm">
+      <div><b>${u.games}</b><span>Games (all time)</span></div><div><b>${u.tables_p}</b><span>Tables poori</span></div>
+      <div><b>${u.sess.length}</b><span>Visits · ${ADMIN.days}d</span></div><div><b>${dur(u.avg)}</b><span>Avg session</span></div>
+      <div><b>${dur(u.secs)}</b><span>Total time · ${ADMIN.days}d</span></div><div><b>${allCo}</b><span>Logo ke saath khela</span></div>
+      <div><b>${u.kot_given}</b><span>Kot diye</span></div><div><b>${u.kot_taken}</b><span>Kot khaye</span></div>
+      <div><b>${u.tours}</b><span>Tournaments</span></div></div>
+    <p class="lab">Last online</p><p style="margin:0 0 10px">${u.online?'🟢 Abhi online · '+esc(u.where):UK(u.last)+' ('+ago(u.last)+')'} · ${esc(u.device)}</p>
+    ${co.length?`<p class="lab">Kiske saath khela (${ADMIN.days}d)</p>${co.map(([id,n])=>`<div class="row" style="padding:4px 0"><span>${nm(id)}</span><b>${n} games</b></div>`).join('')}`:''}
+    <p class="lab" style="margin-top:10px">Visits</p>${u.sess.slice(0,15).map(x=>`<div class="row" style="padding:4px 0;border-top:1px solid var(--line)"><span>${UK(x.started_at)}</span><small>${dur(x.sec)} · ${esc(x.device||'')}</small></div>`).join('')||'<p class="muted">Abhi koi visit record nahi.</p>'}
+    <p class="lab" style="margin-top:10px">Recent games</p>${u.glist.slice(0,10).map(g=>{const r=g.result||{},me=g.players.find(x=>x.id===u.id),mt=me?me.team:0,w=g.players.filter(x=>x.id!==u.id).map(x=>x.bot?'🤖':esc(x.name)).join(', ');
+      return `<div class="row" style="padding:4px 0;border-top:1px solid var(--line)"><span>${UK(g.ended_at)} · ${mt===0?r.a+'–'+r.b:r.b+'–'+r.a}${r.kotTo!=null?(r.kotTo===mt?' · Kot khaya':' · Kot diya 👑'):''}</span><small style="text-align:right">${w}</small></div>`;}).join('')||'<p class="muted">Is range mein koi game nahi.</p>'}
+    <button class="cta ghost" data-act="close" type="button" style="margin-top:14px">Band karo</button>`);
+}
 function onAccount(m){
   NET.pid=m.pid;APP.acct=true;
   const icon=ME.mode==='login'?(m.icon||'🙂'):ME.draft.icon;
   APP.profile={name:m.name,icon};
   try{localStorage.setItem('dp-pid',m.pid);localStorage.setItem('dp-acct','1');localStorage.setItem('dp-profile',JSON.stringify(APP.profile));}catch(e){}
   ME.onboard=false;ME.pin='';
-  NET.ws.send(JSON.stringify({t:'hello',pid:NET.pid,name:APP.profile.name,icon:APP.profile.icon,needAccount:true}));
+  NET.ws.send(JSON.stringify({t:'hello',pid:NET.pid,name:APP.profile.name,icon:APP.profile.icon,needAccount:true,ua:navigator.userAgent,standalone:matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}));
   if(NET.pendingFriend){NET.ws.send(JSON.stringify({t:'friendAdd',fc:NET.pendingFriend}));NET.pendingFriend=null;}
   toast(ME.mode==='login'?`Welcome back, ${m.name}!`:`Swagat hai, ${m.name}! 🃏`);
   goHome();NET.follow=true;
@@ -994,6 +1127,7 @@ function goHome(){
 }
 $('homeMe').addEventListener('click',()=>openMe(false));
 $('homeAbout').addEventListener('click',aboutSheet);
+$('adBack').addEventListener('click',()=>openMe());
 $('tabbar').addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(!b)return;const k=b.dataset.nav;if(k==='home')goHome();if(k==='rank')openRanking();if(k==='friends')openFriends();if(k==='me')openMe(false);});
 function joinSheet(kind){
   openSheet(`<div class="sheethead"><h2>${kind==='tour'?'Tournament':'Table'} join karo</h2><button class="pill" data-act="close" type="button">Close</button></div>
@@ -1926,7 +2060,7 @@ function netConnect(){
   NET.ws=ws;
   ws.onopen=()=>{NET.connected=true;NET.everConnected=true;NET.retry=0;$('netbar').hidden=true;
     if(!APP.acct){if(NET.want&&['checkName','register','login'].includes(NET.want.t)){ws.send(JSON.stringify(NET.want));NET.want=null;}return;}
-    ws.send(JSON.stringify({t:'hello',pid:NET.pid,name:APP.profile.name,icon:APP.profile.icon,needAccount:true}));
+    ws.send(JSON.stringify({t:'hello',pid:NET.pid,name:APP.profile.name,icon:APP.profile.icon,needAccount:true,ua:navigator.userAgent,standalone:matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}));
     if(NET.pendingFriend){ws.send(JSON.stringify({t:'friendAdd',fc:NET.pendingFriend}));NET.pendingFriend=null;}
     if(NET.want){ws.send(JSON.stringify(NET.want));NET.want=null;}};
   ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data);}catch(e){return;}netOnMessage(m);};
@@ -1946,7 +2080,8 @@ function netOnMessage(m){
   if(m.t==='authErr'){const st=$('meUserSt');if(st){st.className='fieldnote bad';st.textContent=m.text;}toast(m.text,'them');const g=$('meGo');if(g){g.disabled=false;g.textContent=ME.mode==='login'?'Login karo':'Shuru karo';}return;}
   if(m.t==='nameFree'){const st=$('meUserSt');if(st&&ME.onboard&&ME.mode!=='login'&&m.username===ME.user){st.className='fieldnote '+(m.free?'good':'bad');st.textContent=m.free?`✅ "${m.username}" available hai`:`❌ "${m.username}" pehle se kisi ka hai`;}return;}
   if(m.t==='needAccount'){APP.acct=false;try{localStorage.removeItem('dp-acct');}catch(e){}closeSheet();openMe(true);toast('Naya account banao ya login karo');return;}
-  if(m.t==='me'){if(APP.profile&&m.name&&APP.profile.name!==m.name){APP.profile.name=m.name;try{localStorage.setItem('dp-profile',JSON.stringify(APP.profile));}catch(e){}}return;}
+  if(m.t==='adminData'){onAdmin(m);return;}
+  if(m.t==='me'){APP.admin=!!m.admin;if(APP.admin&&location.pathname.replace(/\/$/,'')==='/admin'&&!ADMIN.opened){ADMIN.opened=true;openAdmin();}if(APP.profile&&m.name&&APP.profile.name!==m.name){APP.profile.name=m.name;try{localStorage.setItem('dp-profile',JSON.stringify(APP.profile));}catch(e){}}return;}
   if(m.t==='hi'){ if(NET.pendingJoin){netSend({t:'join',code:NET.pendingJoin});NET.pendingJoin=null;} return; }
   if(m.t==='tour'){
     const prev=TOUR.state;TOUR.state=m;

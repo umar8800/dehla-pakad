@@ -225,6 +225,7 @@ class Room {
   newGame() {
     this.table.dealer = (this.table.dealer + 1) % 4;
     this.game = new Game(this.table.dealer);
+    this.gameStartedAt = new Date().toISOString();
     this.phase = 'play';
     this.result = null;
     this.ready.clear();
@@ -311,6 +312,12 @@ class Room {
     this.phase = over ? 'final' : 'result';
     this.ready.clear();
     this.recordStats(r, kotTo, over);
+    db.logGame({
+      code: this.code, kind: this.match ? (this.match.practice ? 'practice' : 'tournament') : 'table',
+      started_at: this.gameStartedAt || null,
+      players: this.seats.map((s, i) => s && { pid: s.bot ? null : s.pid, name: s.name, bot: !!s.bot, team: team(i), seat: i }).filter(Boolean),
+      result: { a: r.a, b: r.b, kotTo, game: T.played, teamNames: this.teamNames, tableOver: !!over, tour: this.match ? this.match.tourCode : null },
+    });
     clearTimeout(this.timers.next);
     if (!over) this.timers.next = setTimeout(() => { if (this.phase === 'result') this.newGame(); }, NEXT_GAME_MS);
     this.broadcast();
