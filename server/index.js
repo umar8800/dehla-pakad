@@ -486,6 +486,16 @@ async function flushUsage() {
 }
 setInterval(() => { meterVoice().then(flushUsage).catch(e => console.error('usage', e.message)); }, Number(process.env.USAGE_MS) || 60_000);
 
+// Keep the free Render server awake: it sleeps after 15 min without inbound traffic and sometimes fails
+// to wake up again. A request to our own public address every 10 min counts as inbound traffic.
+// One service running all month is ~744 h, inside Render's 750 free hours. Set KEEP_AWAKE=off to stop.
+if (process.env.RENDER && process.env.KEEP_AWAKE !== 'off') {
+  const self = `https://${process.env.RENDER_EXTERNAL_HOSTNAME || 'dehlapakad.com'}/healthz`;
+  setInterval(() => fetch(self, { signal: AbortSignal.timeout(20_000), headers: { 'user-agent': 'dehla-pakad-keepawake' } })
+    .catch(e => console.error('keep-awake', e.message)), 10 * 60_000);
+  console.log('keep-awake on:', self);
+}
+
 // Keep open sessions' "last seen" fresh, so a server restart still leaves an accurate end time.
 setInterval(() => db.sessionsTouch([...clients].map(c => c.sessionId).filter(Boolean)), 60_000);
 
