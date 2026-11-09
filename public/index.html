@@ -1032,7 +1032,8 @@ function adminModel(){
   const D=ADMIN.data,P=new Map();
   D.players.forEach(p=>P.set(p.id,{...p,sess:[],glist:[],co:new Map(),secs:0}));
   D.sessions.forEach(x=>{const u=P.get(x.id);if(!u)return;const sec=Math.max(0,(new Date(x.last_at)-new Date(x.started_at))/1000);x.sec=sec;u.sess.push(x);u.secs+=sec;});
-  const human=D.games.filter(g=>g.players.filter(x=>!x.bot).length>=1);
+  D.games.forEach(g=>{g.botsOnly=!g.players.some(x=>!x.bot);});
+  const human=D.games.filter(g=>!g.botsOnly);
   human.forEach(g=>{g.sec=g.started_at?Math.max(0,(new Date(g.ended_at)-new Date(g.started_at))/1000):0;
     const hs=g.players.filter(x=>!x.bot&&x.id);
     hs.forEach(x=>{const u=P.get(x.id);if(!u)return;u.glist.push(g);hs.forEach(y=>{if(y.id!==x.id)u.co.set(y.id,(u.co.get(y.id)||0)+1);});});});
@@ -1075,7 +1076,7 @@ function renderAdmin(){
       <div><b>${active.length}</b><span>Active · ${days}d</span></div>
       <div><b>${newU.length}</b><span>Naye · ${days}d</span></div>
       <div><b>${D.live.length}</b><span>Online abhi</span></div>
-      <div><b>${human.length}</b><span>Games · ${days}d</span><small>${realGames.length} with 2+ log</small></div>
+      <div><b>${human.length}</b><span>Games · ${days}d</span><small>${realGames.length} with 2+ log${D.games.length-human.length?` · ${D.games.length-human.length} sirf bots`:''}</small></div>
       <div><b>${dur(avgSess)}</b><span>Avg session</span></div>
       <div><b>${dur(totSec)}</b><span>Total play time</span></div>
       <div><b>${allSess.length}</b><span>Visits · ${days}d</span></div></div>
@@ -1090,17 +1091,21 @@ function renderAdmin(){
     const sorts={last:(a,b)=>new Date(b.last||0)-new Date(a.last||0),games:(a,b)=>b.games-a.games,time:(a,b)=>b.secs-a.secs,visits:(a,b)=>b.sess.length-a.sess.length,joined:(a,b)=>new Date(b.created_at)-new Date(a.created_at)};
     const list=[...users].sort(sorts[ADMIN.sort]);
     body=`<div class="chiprow">${[['last','Last online'],['games','Games'],['time','Play time'],['visits','Visits'],['joined','Naye']].map(([k,l])=>`<button class="pill sm ${ADMIN.sort===k?'on':''}" data-sort="${k}" type="button">${l}</button>`).join('')}</div>
-    <div class="panel adlist">${list.map(u=>`<button class="adu" type="button" data-u="${u.id}"><span class="ic">${av(u.icon)}${u.online?'<i></i>':''}</span>
+    <div class="panel adlist">${list.length?'':`<p class="muted" style="margin:8px 0">Koi player nahi mila. Upar ↻ dabao. (server se ${D.players.length} players aaye)</p>`}${list.map(u=>`<button class="adu" type="button" data-u="${u.id}"><span class="ic">${av(u.icon)}${u.online?'<i></i>':''}</span>
       <div class="nm"><b>${esc(u.name)}</b><small>${u.online?'🟢 '+esc(u.where):ago(u.last)} · joined ${UKday(u.created_at)}</small></div>
       <div class="adnums"><span><b>${u.games}</b>games</span><span><b>${u.sess.length}</b>visits</span><span><b>${dur(u.avg)}</b>avg</span></div></button>`).join('')}</div>
     <p class="fieldnote">Visits, time aur avg pichhle ${days} din ke hain. Games all-time hain. Tracking 8 Nov 2026 se shuru hui.</p>`;
   }
   if(ADMIN.tab==='games'){
-    body=`<div class="panel adlist">${human.slice(0,150).map(g=>{const r=g.result||{},tn=r.teamNames||['A','B'];const t0=g.players.filter(x=>x.team===0),t1=g.players.filter(x=>x.team===1);
+    const gf=ADMIN.gfilter||'people',bo=D.games.filter(g=>g.botsOnly).length;
+    const shown=gf==='all'?D.games:gf==='bots'?D.games.filter(g=>g.botsOnly):human;
+    body=`<div class="chiprow">${[['people',`Logon wale (${human.length})`],['bots',`Sirf bots (${bo})`],['all',`Sab (${D.games.length})`]].map(([k,l])=>`<button class="pill sm ${gf===k?'on':''}" data-gf="${k}" type="button">${l}</button>`).join('')}</div>
+    <div class="panel adlist">${shown.slice(0,150).map(g=>{const r=g.result||{},tn=r.teamNames||['A','B'];const t0=g.players.filter(x=>x.team===0),t1=g.players.filter(x=>x.team===1);
       const who=a=>a.map(x=>x.bot?`<span class="muted">🤖${esc(x.name)}</span>`:esc(x.name)).join(', ');
-      return `<div class="adg"><div class="row"><b>${g.kind==='table'?'Table':g.kind==='tournament'?'🏆 Tournament':'Practice'} · DP-${esc(g.code)}</b><small>${UK(g.ended_at)}${g.sec?' · '+dur(g.sec):''}</small></div>
+      return `<div class="adg"><div class="row"><b>${g.kind==='table'?'Table':g.kind==='tournament'?'🏆 Tournament':'Practice'}${g.botsOnly?' · 🤖 sirf bots':''} · DP-${esc(g.code)}</b><small>${UK(g.ended_at)}${g.sec?' · '+dur(g.sec):''}</small></div>
       <div class="adteams"><span>${esc(tn[0]||'A')}: ${who(t0)}</span><b>${r.a}–${r.b}</b><span>${esc(tn[1]||'B')}: ${who(t1)}</span></div>
-      ${r.kotTo!=null?`<small class="kotnote">Kot: ${esc(tn[r.kotTo]||'')}</small>`:''}</div>`;}).join('')||'<p class="muted" style="margin:0">Is range mein koi game nahi.</p>'}</div>`;
+      ${r.kotTo!=null?`<small class="kotnote">Kot: ${esc(tn[r.kotTo]||'')}</small>`:''}</div>`;}).join('')||`<p class="muted" style="margin:0">${gf==='people'&&bo?`Is range mein logon ka koi online game nahi. ${bo} games sirf bots ne khele (koi practice tournament jo khaali chal raha tha).`:'Is range mein koi game nahi.'}</p>`}</div>
+    <p class="fieldnote">Offline practice phone pe chalti hai, woh yahan nahi dikhti.</p>`;
   }
   if(ADMIN.tab==='usage') body=usageHTML(P);
   if(ADMIN.tab==='live'){
@@ -1117,6 +1122,7 @@ function renderAdmin(){
   $('adRefresh').addEventListener('click',adminAsk);
   $('adRevoke').addEventListener('click',()=>openSheet(`<h2>Sab phones se admin hatao?</h2><p>Har phone pe dobara email code chahiye hoga, is phone pe bhi.</p><button class="cta" data-act="go" type="button">Haan, hatao</button><button class="cta ghost" data-act="close" type="button">Nahi</button>`,{go:()=>{closeSheet();try{localStorage.removeItem('dp-admin');}catch(e){}netSend({t:'adminCode',a:'revoke'});}}));
   b.querySelectorAll('[data-atab]').forEach(x=>x.addEventListener('click',()=>{ADMIN.tab=x.dataset.atab;renderAdmin();if(ADMIN.tab==='usage')netSend({t:'adminUsage'});}));
+  b.querySelectorAll('[data-gf]').forEach(x=>x.addEventListener('click',()=>{ADMIN.gfilter=x.dataset.gf;renderAdmin();}));
   b.querySelectorAll('[data-sort]').forEach(x=>x.addEventListener('click',()=>{ADMIN.sort=x.dataset.sort;renderAdmin();}));
   b.querySelectorAll('[data-u]').forEach(x=>x.addEventListener('click',()=>adminUser(P.get(x.dataset.u),P)));
 }
@@ -2130,7 +2136,7 @@ function playPractice(){
 
 /* ================= online friends tables ================= */
 const NET={ws:null,state:null,imgs:[null,null,null,null],want:null,connected:false,retry:0,sel:null,resultKey:null,follow:true,pendingJoin:null,logs:[],promptFor:null,chromeKey:null,everConnected:false};
-window.NET=NET;window.TOUR=TOUR;window.TIPS=TIPS;window.APP=APP; // handy for debugging from the browser console
+window.NET=NET;window.TOUR=TOUR;window.TIPS=TIPS;window.APP=APP;window.DPA={onAdmin:m=>onAdmin(m),render:()=>renderAdmin(),ADMIN,show:id=>show(id)}; // handy for debugging from the browser console
 NET.pid=(()=>{let p=null;try{p=localStorage.getItem('dp-pid');}catch(e){}if(!p){p='p'+Math.random().toString(36).slice(2)+Date.now().toString(36);try{localStorage.setItem('dp-pid',p);}catch(e){}}return p;})();
 function netConnect(){
   if(NET.ws&&(NET.ws.readyState===0||NET.ws.readyState===1)) return;

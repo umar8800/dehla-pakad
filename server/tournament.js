@@ -206,6 +206,10 @@ class Tournament {
 
   tick() {
     if (!['league', 'semi', 'final'].includes(this.phase)) return;
+    // Nobody real is here (everyone left or phones went away for 10+ min): don't keep starting bot-only matches.
+    if (this.players.some(p => !p.bot && p.connected)) this.lastHuman = Date.now();
+    else if (Date.now() - (this.lastHuman || Date.now()) > 10 * 60_000) return;
+    else if (!this.lastHuman) this.lastHuman = Date.now();
     for (const m of this.stageMatches()) {
       if (m.status !== 'waiting' || this.busy(m.a) || this.busy(m.b)) continue;
       this.startMatch(m);

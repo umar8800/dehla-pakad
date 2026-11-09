@@ -372,6 +372,7 @@ wss.on('connection', (ws, req) => {
           d.players = d.players.map(({ pid, friends, ...p }) => ({ ...p, id: id(pid), friends: (friends || []).map(id), icon: rankIcon(p.icon) }));
           d.sessions = d.sessions.map(({ pid, ...x }) => ({ ...x, id: id(pid) }));
           d.games = d.games.map(g => ({ ...g, players: (g.players || []).map(({ pid, ...x }) => ({ ...x, id: id(pid) })) }));
+          console.log(`admin dashboard: ${d.players.length} players, ${d.sessions.length} visits, ${d.games.length} games (${days}d)`);
           send({ t: 'adminData', days, now: new Date().toISOString(), live: [...uniq.values()].map(l => ({ id: id(l.pid), where: l.where })), ...d,
             rooms: [...rooms.values()].map(r => ({ code: r.code, phase: r.phase, match: !!r.match, seats: r.seats.map(s => s && { name: s.name, bot: !!s.bot, on: !!s.connected }), watchers: r.watchers.size })),
             tours: [...tours.values()].map(t => ({ code: t.code, phase: t.phase, players: t.players.length })) });
