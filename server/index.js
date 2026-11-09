@@ -326,7 +326,7 @@ wss.on('connection', (ws, req) => {
           if (!info || !client.adminOk) return err('Ye sirf admin ke liye hai');
           const u = await db.usageData();
           const id = pid => pid ? fcode(pid) : null;
-          send({ t: 'adminUsage', now: new Date().toISOString(), voiceNow: [...voiceNow.values()].reduce((a, b) => a + b, 0),
+          send({ t: 'adminUsage', now: new Date().toISOString(),   // usage_daily.day is a plain date, safe everywhere voiceNow: [...voiceNow.values()].reduce((a, b) => a + b, 0),
             daily: u.daily, voice: u.voice.map(({ pid, ...x }) => ({ ...x, id: id(pid) })), dbBytes: u.dbBytes, emailOn: !!RESEND_KEY });
         }).catch(e => { console.error('adminUsage', e.message); err('Server error'); });
         return;
@@ -369,6 +369,12 @@ wss.on('connection', (ws, req) => {
           const uniq = new Map(); live.forEach(l => uniq.set(l.pid, l));
           // never send private login ids, only public friend codes
           const id = pid => pid ? fcode(pid) : null;
+          // Postgres gives microsecond times ("...48.227091+00:00") that Safari can't parse: send plain ISO times
+          const iso = t => { if (!t) return t; const d = new Date(t); return isNaN(d) ? t : d.toISOString(); };
+          const fixT = (o, keys) => { keys.forEach(k => { if (o[k]) o[k] = iso(o[k]); }); return o; };
+          d.players.forEach(p => fixT(p, ['created_at', 'updated_at']));
+          d.sessions.forEach(x => fixT(x, ['started_at', 'last_at']));
+          d.games.forEach(g => fixT(g, ['started_at', 'ended_at']));
           d.players = d.players.map(({ pid, friends, ...p }) => ({ ...p, id: id(pid), friends: (friends || []).map(id), icon: rankIcon(p.icon) }));
           d.sessions = d.sessions.map(({ pid, ...x }) => ({ ...x, id: id(pid) }));
           d.games = d.games.map(g => ({ ...g, players: (g.players || []).map(({ pid, ...x }) => ({ ...x, id: id(pid) })) }));

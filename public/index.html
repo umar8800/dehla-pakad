@@ -144,7 +144,7 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .adkpis b{font-size:22px;font-weight:800;line-height:1.1}.adkpis.sm b{font-size:17px}.adkpis span{font-size:12px;color:var(--muted)}.adkpis small{font-size:11px;color:var(--muted)}
 .adchart{width:100%;height:110px;display:block}.adaxis{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px}
 .adfun{display:grid;grid-template-columns:150px 1fr 34px;align-items:center;gap:8px;padding:4px 0;font-size:13px}.adfun div{height:10px;background:rgba(246,238,226,.08);border-radius:6px;overflow:hidden}.adfun i{display:block;height:100%;background:var(--brass);border-radius:6px}.adfun b{text-align:right}
-.adlist{padding:4px 12px}.adu{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;border-top:1px solid var(--line);padding:10px 0;color:inherit;text-align:left;font:inherit}.adu:first-child{border-top:none}
+.adlist{padding:4px 12px}.adu{display:flex;align-items:center;gap:10px;width:100%;min-height:58px;border-top:1px solid var(--line);padding:10px 0;color:inherit;text-align:left;cursor:pointer}.adu:first-child{border-top:none}
 .adu .ic{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:20px;background:rgba(246,238,226,.07);position:relative;flex:none}.adu .ic i{position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;background:#62d3b1;border:2px solid #1a1225}
 .adu .nm{flex:1;min-width:0}.adu .nm b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.adu .nm small{font-size:11.5px;color:var(--muted)}
 .adnums{display:flex;gap:8px;flex:none}.adnums span{display:flex;flex-direction:column;align-items:center;font-size:10.5px;color:var(--muted);min-width:34px}.adnums b{font-size:14px;color:var(--ink)}
@@ -1028,8 +1028,17 @@ function onAdminAuth(m){
   const vb=$('adVerify');if(vb)vb.addEventListener('click',()=>{const c=($('adCode').value||'').trim();if(c.length!==6){toast('6 numbers ka code daalo','them');return;}vb.disabled=true;vb.textContent='Check kar rahe hain…';netSend({t:'adminCode',a:'verify',code:c,device:navigator.userAgent.slice(0,60)});});
 }
 function onAdmin(m){ADMIN.data=m;if(!$('scr-admin').hidden)renderAdmin();}
+// If the dashboard ever fails to draw, show the reason and send it to the server log.
+const _renderAdmin=()=>{try{renderAdminInner();const n=document.querySelectorAll('#adBody .adu').length;
+  if(ADMIN.tab==='players'&&ADMIN.data&&ADMIN.data.players.length&&!n)netSend({t:'clientLog',where:'admin-empty',msg:`players=${ADMIN.data.players.length} rows=0`,ua:navigator.userAgent});}
+  catch(e){netSend({t:'clientLog',where:'admin-render',msg:String(e&&e.stack||e).slice(0,280),ua:navigator.userAgent});
+    $('adBody').innerHTML=`<div class="panel"><p class="fieldnote bad">Dashboard dikhane mein error: ${esc(String(e&&e.message||e))}</p></div>`;}};
+const isoFix=t=>typeof t==='string'?t.replace(/(\.\d{3})\d+/,'$1').replace(/\+00:00$/,'Z'):t;
 function adminModel(){
   const D=ADMIN.data,P=new Map();
+  D.players.forEach(p=>{p.created_at=isoFix(p.created_at);p.updated_at=isoFix(p.updated_at);});
+  D.sessions.forEach(x=>{x.started_at=isoFix(x.started_at);x.last_at=isoFix(x.last_at);});
+  D.games.forEach(g=>{g.started_at=isoFix(g.started_at);g.ended_at=isoFix(g.ended_at);});
   D.players.forEach(p=>P.set(p.id,{...p,sess:[],glist:[],co:new Map(),secs:0}));
   D.sessions.forEach(x=>{const u=P.get(x.id);if(!u)return;const sec=Math.max(0,(new Date(x.last_at)-new Date(x.started_at))/1000);x.sec=sec;u.sess.push(x);u.secs+=sec;});
   D.games.forEach(g=>{g.botsOnly=!g.players.some(x=>!x.bot);});
@@ -1051,7 +1060,8 @@ function bars(vals,labels,color,h=90){
   return `<svg viewBox="0 0 100 ${h+14}" preserveAspectRatio="none" class="adchart" role="img">${vals.map((v,i)=>{const bh=v/max*h;return `<rect x="${i*w+w*.15}" y="${h-bh}" width="${w*.7}" height="${Math.max(bh,v?1.5:0)}" rx="1" fill="${color}"><title>${labels[i]}: ${v}</title></rect>`;}).join('')}</svg>
   <div class="adaxis"><span>${labels[0]}</span><span>max ${max}</span><span>${labels[labels.length-1]}</span></div>`;
 }
-function renderAdmin(){
+function renderAdmin(){_renderAdmin();}
+function renderAdminInner(){
   const {D,users,human,P}=adminModel(),days=ADMIN.days,since=Date.now()-days*86400000;
   const nm=id=>{const u=P.get(id);return u?esc(u.name):'?';};
   const active=users.filter(u=>u.sess.length||u.online),newU=users.filter(u=>new Date(u.created_at)>since);
@@ -1091,9 +1101,9 @@ function renderAdmin(){
     const sorts={last:(a,b)=>new Date(b.last||0)-new Date(a.last||0),games:(a,b)=>b.games-a.games,time:(a,b)=>b.secs-a.secs,visits:(a,b)=>b.sess.length-a.sess.length,joined:(a,b)=>new Date(b.created_at)-new Date(a.created_at)};
     const list=[...users].sort(sorts[ADMIN.sort]);
     body=`<div class="chiprow">${[['last','Last online'],['games','Games'],['time','Play time'],['visits','Visits'],['joined','Naye']].map(([k,l])=>`<button class="pill sm ${ADMIN.sort===k?'on':''}" data-sort="${k}" type="button">${l}</button>`).join('')}</div>
-    <div class="panel adlist">${list.length?'':`<p class="muted" style="margin:8px 0">Koi player nahi mila. Upar ↻ dabao. (server se ${D.players.length} players aaye)</p>`}${list.map(u=>`<button class="adu" type="button" data-u="${u.id}"><span class="ic">${av(u.icon)}${u.online?'<i></i>':''}</span>
+    <div class="panel adlist">${list.length?'':`<p class="muted" style="margin:8px 0">Koi player nahi mila. Upar ↻ dabao. (server se ${D.players.length} players aaye)</p>`}${list.map(u=>`<div class="adu" role="button" tabindex="0" data-u="${u.id}"><span class="ic">${av(u.icon)}${u.online?'<i></i>':''}</span>
       <div class="nm"><b>${esc(u.name)}</b><small>${u.online?'🟢 '+esc(u.where):ago(u.last)} · joined ${UKday(u.created_at)}</small></div>
-      <div class="adnums"><span><b>${u.games}</b>games</span><span><b>${u.sess.length}</b>visits</span><span><b>${dur(u.avg)}</b>avg</span></div></button>`).join('')}</div>
+      <div class="adnums"><span><b>${u.games}</b>games</span><span><b>${u.sess.length}</b>visits</span><span><b>${dur(u.avg)}</b>avg</span></div></div>`).join('')}</div>
     <p class="fieldnote">Visits, time aur avg pichhle ${days} din ke hain. Games all-time hain. Tracking 8 Nov 2026 se shuru hui.</p>`;
   }
   if(ADMIN.tab==='games'){
