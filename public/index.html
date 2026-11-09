@@ -18,9 +18,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Dehla Pakad">
 <style>html{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:#1a1225}*,*::before,*::after{box-sizing:inherit}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="preload" href="/fonts/figtree.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:'Bricolage Grotesque';font-style:normal;font-weight:200 800;font-display:swap;src:url(/fonts/bricolage.woff2) format('woff2-variations'),url(/fonts/bricolage.woff2) format('woff2')}
+@font-face{font-family:'Figtree';font-style:normal;font-weight:300 900;font-display:swap;src:url(/fonts/figtree.woff2) format('woff2-variations'),url(/fonts/figtree.woff2) format('woff2')}
+</style>
 <style>
 /* Layout: phone app, one screen at a time — home, setup, lobby, dashboard scroll; the game screen is a fixed one-screen table. Deliberately single dark look (lamp-lit card table). */
 :root{
@@ -238,6 +240,8 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 .hg.kg{border-color:var(--brass);color:var(--brass)}
 
 [hidden]{display:none!important}
+.offbar{background:#3a2c4f;color:#f6eee2;font-size:13px;font-weight:600;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin:0 0 12px;line-height:1.35}
+.updbar{position:fixed;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top,0px));z-index:41;background:var(--brass);color:#2a1a05;border:none;border-radius:12px;font:inherit;font-weight:800;font-size:14px;padding:11px 14px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .netbar{position:fixed;left:0;right:0;top:0;z-index:40;background:#c8102e;color:#fff;font-weight:700;font-size:13px;text-align:center;padding:calc(8px + env(safe-area-inset-top,0px)) 16px 8px}
 .rmb{margin-left:auto;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:rgba(246,238,226,.12);font-size:11px;flex:none}
 .pchip[disabled]{cursor:default;opacity:1}
@@ -636,6 +640,7 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
 <section class="screen" id="scr-home" hidden>
   <div class="homehead"><div class="logo">Dehla<b>Pakad</b></div><button class="me" id="homeMe" type="button" aria-label="Profile"></button></div>
   <p class="greet" id="homeGreet"></p>
+  <div class="offbar" id="offbar" hidden>📴 Internet nahi hai. Offline practice khel sakte ho; online cheezein internet aane par chalengi.</div>
   <div id="homeTourCard"></div>
   <div class="bigmodes">
     <section class="bigcard friends">
@@ -749,6 +754,7 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.02em;margin:0;text-wrap:b
   <div class="stack-v" id="olBody"></div>
 </section>
 <div class="netbar" id="netbar" hidden>Connection toot gaya. Jod rahe hain…</div>
+<button class="updbar" id="updbar" type="button" hidden>✨ Naya version aaya · Tap karke reload karo</button>
 <div id="voiceAudio" hidden></div>
 <div id="overlay"></div>
 <div id="toastHost"></div>
@@ -933,7 +939,8 @@ function renderMe(){
   </div></div>
   ${login?'':avPanel}
   <button class="cta" id="meGo" type="button">${login?'Login karo':'Shuru karo'}</button>
-  <p class="fieldnote" style="text-align:center;margin:0">${login?'Tumhari ranking, dost aur stats wapas aa jayenge.':'Koi email ya phone number nahi chahiye.'}</p>`;
+  <p class="fieldnote" style="text-align:center;margin:0">${login?'Tumhari ranking, dost aur stats wapas aa jayenge.':'Koi email ya phone number nahi chahiye.'}</p>
+  <button class="cta ghost" id="meGuest" type="button">${!navigator.onLine?'📴 Internet nahi hai · ':''}Abhi offline practice khelo (bina account)</button>`;
   } else {
     $('meBody').innerHTML=`
   <div class="panel mehead"><div class="bigav">${av(D.icon)}</div><div class="stack-v" style="gap:4px;flex:1;min-width:0"><p class="lab" style="margin:0">Username</p><b style="font-size:22px">${esc(APP.profile.name)}</b><small class="fieldnote">Username fix hai. Avatar badal sakte ho.</small></div></div>
@@ -974,7 +981,8 @@ function renderMe(){
       netSend(ME.mode==='login'?{t:'login',username:user,pin:p}:{t:'register',username:user,pin:p,icon:D.icon});
       $('meGo').disabled=true;$('meGo').textContent='Ek second…';setTimeout(()=>{const g=$('meGo');if(g){g.disabled=false;g.textContent=ME.mode==='login'?'Login karo':'Shuru karo';}},4000);
     });
-    if(ME.user&&ME.mode!=='login'&&/^[A-Za-z0-9_]{3,14}$/.test(ME.user))netSend({t:'checkName',username:ME.user});
+    $('meGuest').addEventListener('click',()=>{APP.guest=true;if(!APP.profile)APP.profile={name:'Tum',icon:D.icon||'🙂'};try{localStorage.setItem('dp-guest','1');localStorage.setItem('dp-guest-profile',JSON.stringify(APP.profile));}catch(e){}ME.onboard=false;goHome();toast('Offline practice ready. Online ke liye baad mein username bana lena.');});
+    if(ME.user&&ME.mode!=='login'&&/^[A-Za-z0-9_]{3,14}$/.test(ME.user)&&!isOffline())netSend({t:'checkName',username:ME.user});
     return;
   }
   const ma=$('meAdmin');if(ma)ma.addEventListener('click',openAdmin);
@@ -1167,7 +1175,7 @@ function adminUser(u,P){
     <button class="cta ghost" data-act="close" type="button" style="margin-top:14px">Band karo</button>`);
 }
 function onAccount(m){
-  NET.pid=m.pid;APP.acct=true;
+  NET.pid=m.pid;APP.acct=true;APP.guest=false;try{localStorage.removeItem('dp-guest');}catch(e){}
   const icon=ME.mode==='login'?(m.icon||'🙂'):ME.draft.icon;
   APP.profile={name:m.name,icon};
   try{localStorage.setItem('dp-pid',m.pid);localStorage.setItem('dp-acct','1');localStorage.setItem('dp-profile',JSON.stringify(APP.profile));}catch(e){}
@@ -1187,10 +1195,10 @@ function goHome(){
   $('homeGreet').textContent=`Salaam ${APP.profile.name}! ${g||k?`Ab tak ${g} Kot diye, ${k} khaye.`:'Aaj kiski Kot hogi?'}`;
   show('scr-home');
 }
-$('homeMe').addEventListener('click',()=>openMe(false));
+$('homeMe').addEventListener('click',()=>openMe(!APP.acct));
 $('homeAbout').addEventListener('click',aboutSheet);
 $('adBack').addEventListener('click',()=>openMe());
-$('tabbar').addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(!b)return;const k=b.dataset.nav;if(k==='home')goHome();if(k==='rank')openRanking();if(k==='friends')openFriends();if(k==='me')openMe(false);});
+$('tabbar').addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(!b)return;const k=b.dataset.nav;if(k!=='home'&&!APP.acct){if(!isOffline()){toast('Iske liye username banao (ek baar).');openMe(true);}else toast('Internet nahi hai. Offline practice khel sakte ho.','them');return;}if(k==='home')goHome();if(k==='rank')openRanking();if(k==='friends')openFriends();if(k==='me')openMe(false);});
 function joinSheet(kind){
   openSheet(`<div class="sheethead"><h2>${kind==='tour'?'Tournament':'Table'} join karo</h2><button class="pill" data-act="close" type="button">Close</button></div>
     <p class="muted" style="margin:0 0 10px">Host ne jo code bheja hai, woh likho.</p>
@@ -1202,8 +1210,16 @@ function joinSheet(kind){
     else{NET.follow=true;netSend({t:'join',code:v});}}});
   setTimeout(()=>{const i=$('jcode');if(i)i.focus();},50);
 }
+const isOffline=()=>!navigator.onLine&&!NET.connected;
+// Online features need internet and an account; offline practice needs neither.
+function needOnline(){
+  if(isOffline()){toast('Internet nahi hai. Offline practice khel sakte ho.','them');return true;}
+  if(!APP.acct){toast('Online khelne ke liye username banao (ek baar).');openMe(true);return true;}
+  return false;
+}
 document.querySelectorAll('[data-home]').forEach(b=>b.addEventListener('click',()=>{
   const k=b.dataset.home;
+  if(k!=='offline'&&needOnline()) return;
   if(k==='friends-new'){NET.follow=true;netSend({t:'create'});toast('Table ban rahi hai…');}
   if(k==='friends-join') joinSheet('table');
   if(k==='tour-new'){ if(TOUR.state&&TOUR.state.phase!=='done'){TOUR.follow=true;openTourScreen();toast('Tum pehle se ek tournament mein ho');} else openTourSetup(); }
@@ -2141,7 +2157,7 @@ function netOnMessage(m){
   if(m.t==='account'){onAccount(m);return;}
   if(m.t==='authErr'){const st=$('meUserSt');if(st){st.className='fieldnote bad';st.textContent=m.text;}toast(m.text,'them');const g=$('meGo');if(g){g.disabled=false;g.textContent=ME.mode==='login'?'Login karo':'Shuru karo';}return;}
   if(m.t==='nameFree'){const st=$('meUserSt');if(st&&ME.onboard&&ME.mode!=='login'&&m.username===ME.user){st.className='fieldnote '+(m.free?'good':'bad');st.textContent=m.free?`✅ "${m.username}" available hai`:`❌ "${m.username}" pehle se kisi ka hai`;}return;}
-  if(m.t==='needAccount'){APP.acct=false;try{localStorage.removeItem('dp-acct');}catch(e){}closeSheet();openMe(true);toast('Naya account banao ya login karo');return;}
+  if(m.t==='needAccount'){if(APP.guest)return;APP.acct=false;try{localStorage.removeItem('dp-acct');}catch(e){}closeSheet();openMe(true);toast('Naya account banao ya login karo');return;}
   if(m.t==='adminData'){onAdmin(m);return;}
   if(m.t==='adminAuth'){onAdminAuth(m);return;}
   if(m.t==='adminUsage'){ADMIN.usage=m;if(!$('scr-admin').hidden&&ADMIN.tab==='usage')renderAdmin();return;}
@@ -2530,8 +2546,17 @@ function voiceMuteToggle(absSeat){
 /* ================= boot ================= */
 (()=>{const fm=location.pathname.match(/^\/f\/([A-Za-z0-9]{6})\/?$/);if(fm){NET.pendingFriend=fm[1].toUpperCase();history.replaceState(null,'','/');}})();
 (()=>{const q=new URLSearchParams(location.search),pm=location.pathname.match(/^\/(?:dp-?)?(\d{4,6})\/?$/i),j=(q.get('join')||(pm?pm[1]:'')).replace(/\D/g,'');if(j){NET.pendingJoin=j;history.replaceState(null,'','/');}})();
-if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
-if(APP.profile&&APP.acct){ goHome(); NET.follow=true; netConnect(); } else { openMe(true); netConnect(); }
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='update'&&!NET.state)$('updbar').hidden=false;});
+}
+$('updbar').addEventListener('click',()=>location.reload());
+const syncOff=()=>{$('offbar').hidden=navigator.onLine;};
+addEventListener('online',()=>{syncOff();netConnect();});addEventListener('offline',syncOff);syncOff();
+try{if(!APP.acct&&localStorage.getItem('dp-guest')==='1'){APP.guest=true;APP.profile=JSON.parse(localStorage.getItem('dp-guest-profile')||'null')||{name:'Tum',icon:'🙂'};}}catch(e){}
+if(APP.profile&&APP.acct){ goHome(); NET.follow=true; netConnect(); }
+else if(APP.guest){ goHome(); netConnect(); }
+else { openMe(true); netConnect(); }
 })();
 </script>
 

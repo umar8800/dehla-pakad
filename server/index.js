@@ -43,7 +43,7 @@ const LK_CLIENT = path.join(__dirname, '..', 'node_modules', 'livekit-client', '
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, '..', 'public');
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 
 const rooms = new Map();   // code -> Room (friends tables and tournament matches)
 const tours = new Map();   // code -> Tournament
@@ -66,7 +66,7 @@ const USAGE = { http: 0, ws: 0, voice: 0, mic: 0, peak: 0, codes: 0, users: new 
 function serve(req, res, c, cacheControl) {
   const head = { 'content-type': c.type, 'cache-control': cacheControl, etag: c.etag, vary: 'accept-encoding' };
   if (req.headers['if-none-match'] === c.etag) { res.writeHead(304, head); return res.end(); }
-  const gz = /\bgzip\b/.test(req.headers['accept-encoding'] || '') && !c.type.startsWith('image/');
+  const gz = /\bgzip\b/.test(req.headers['accept-encoding'] || '') && !/^(image|font)\//.test(c.type);
   const body = gz ? c.gz : c.body;
   if (gz) head['content-encoding'] = 'gzip';
   head['content-length'] = body.length;
