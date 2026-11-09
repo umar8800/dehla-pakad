@@ -2,7 +2,7 @@
 // The whole app (page, fonts, icons) is saved on the phone the first time it opens with internet.
 // After that it opens instantly from the phone, with or without internet: the saved copy is shown
 // straight away and a fresh copy is fetched quietly in the background for next time.
-const VERSION = 'dp-v3';
+const VERSION = 'dp-v4';
 const SHELL = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/fonts/figtree.woff2', '/fonts/bricolage.woff2'];
 
 self.addEventListener('install', e => {
@@ -31,12 +31,14 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.startsWith('/ws') || url.pathname === '/healthz') return;
 
-  // Any page address (/, /1234 invite links, /f/CODE, /admin) is the same app: serve the saved copy instantly.
+  // Any page address (/, /1234 invite links, /f/CODE, /admin) is the same app.
+  // With internet: get the newest page (wait up to 3 s). No internet or server asleep: use the saved copy.
   if (req.mode === 'navigate' || url.pathname === '/') {
     e.respondWith(caches.open(VERSION).then(async cache => {
       const saved = await cache.match('/');
-      if (saved) { e.waitUntil(refreshShell(cache)); return saved; }
-      try { const res = await withTimeout(fetch('/'), 30000); if (res.ok) cache.put('/', res.clone()); return res; }
+      const net = fetch('/', { cache: 'no-cache' }).then(res => { if (res.ok) cache.put('/', res.clone()); return res; });
+      if (saved) { e.waitUntil(net.catch(() => {})); try { return await withTimeout(net.then(r => r.clone()), 3000); } catch (err) { return saved; } }
+      try { return await withTimeout(net, 30000); }
       catch (err) { return new Response('<h2 style="font-family:sans-serif;padding:24px">Dehla Pakad pehli baar kholne ke liye internet chahiye. Internet on karke dobara kholo.</h2>', { headers: { 'content-type': 'text/html; charset=utf-8' } }); }
     }));
     return;
